@@ -4,13 +4,20 @@ import { Button } from "./button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card"
 import LanguageCombobox from "./language-combobox"
 import React from "react"
-import { getUploadUrl } from "@/api/upload"
+import {uploadImage} from "@/api/upload"
 
 /*
 type ImageFormProps = {
   setImg: (value: { image: File | null, text: string}) => void
   setProc: (value: boolean) => void
 } */
+
+/*
+{
+        contentType:image.type,
+      }
+
+*/
 
 
 export default function ImageForm(){
@@ -26,12 +33,11 @@ export default function ImageForm(){
     }
 
     try {
-      const uploadUrl = await getUploadUrl({
-        contentType:image.type,
-      });
-      console.log(uploadUrl)
+      const jobId = await uploadImage({contentType: image.type}, image);
+      console.log("Image upload was successful!");
+      console.log("Job ID: ", jobId);
     } catch (error) {
-      console.error(error)
+      console.error("Image upload failed: ", error)
     }
   };
 
