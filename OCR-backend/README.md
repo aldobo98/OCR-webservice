@@ -9,4 +9,4 @@ OCR-backend tartalmazza a kódot, amely a karakterfelismeréshez biztosítja a s
 
     - Kommunikáció az adatbázis felé
 
-    - Kommunikáció OpenFaaS felé
+    - Kommunikáció Eseménykezelő felé

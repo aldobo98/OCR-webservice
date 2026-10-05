@@ -8,14 +8,25 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/aldobo98/OCR-backend/handler"
+	"github.com/aldobo98/ocr-common/aws_s3"
 )
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	s3_storage := aws_s3.NewAWS_S3(logger, "http://10.8.0.1:31374", "ocr", "")
+	err := s3_storage.Ensurebucket()
+	if err != nil {
+		logger.Error("Failed to ensure s3 bucket", "error", err)
+	}
 
 	//Serve already built frontend
 	fs := http.FileServer(http.Dir("../OCR-frontend/dist"))
 	http.Handle("/", fs)
+
+	//A presigned URL requestet a /api/uploadurl endpoint fogja kiszolgálni
+	http.HandleFunc("/api/uploadurl", handler.CreateJobRequestHandler(logger, s3_storage))
 	//Start HTTP server in a goroutine
 	s := http.Server{Addr: ":8080"}
 	go func() {
@@ -33,7 +44,7 @@ func main() {
 	logger.Info("Shutdown signal received")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	err := s.Shutdown(ctx)
+	err = s.Shutdown(ctx)
 	if err != nil {
 		logger.Info("Graceful server shutdown failed with", "error", err)
 	} else {

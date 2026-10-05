@@ -4,34 +4,39 @@ import { Button } from "./button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card"
 import LanguageCombobox from "./language-combobox"
 import React from "react"
+import { getUploadUrl } from "@/api/upload"
 
+/*
 type ImageFormProps = {
   setImg: (value: { image: File | null, text: string}) => void
   setProc: (value: boolean) => void
-}
+} */
 
 
-
-export default function ImageForm({setImg, setProc}: ImageFormProps){
+export default function ImageForm(){
 
   const [language, setLanguage] = React.useState("eng")
   const [image, setImage] = React.useState<File | null>(null)
 
+  const handleSubmit = async (event: React.SubmitEvent) => {
+    event.preventDefault();
+
+    if (!image) {
+      return;
+    }
+
+    try {
+      const uploadUrl = await getUploadUrl({
+        contentType:image.type,
+      });
+      console.log(uploadUrl)
+    } catch (error) {
+      console.error(error)
+    }
+  };
+
   return (
-    <form onSubmit={(e) => {
-      e.preventDefault()
-
-      //először a processzálást kezdjük meg
-      setProc(true);
-      setImg({image: null, text: "Processzálás folyamatban"});
-
-      //Majd "eltelik" a megfelelő idő a demóhoz
-      setTimeout(() => {
-        setProc(false);
-        setImg({image: image, text: "Beküldött kép"})
-        console.log("Nyelv: ", language)
-      }, 30000);
-    }} >
+    <form onSubmit= {handleSubmit} >
     <Card className="w-full max-w-lg">
       <CardHeader>
         <CardTitle>Karakterfelismerés</CardTitle>
