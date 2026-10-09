@@ -1,0 +1,15 @@
+env:
+  #APP_VERSION tartalmazza a git commit SHA-t, amit a docker image buildelésére, majd a podban tagelésre fogunk használni.
+  APP_VERSION: latest
+
+s3:
+  #Secret, amiben benne van az S3 access key és secret access key.
+  accessSecretName: s3-credentals
+  #A két kulcsérték, amiben az accessKey és a secretAccessKey található. A default értékek azok, amiket az S3 is defaultból megad.
+  accessKeyKey: AWS_ACCESS_KEY_ID
+  secretAccessKeyKey: AWS_SECRET_ACCESS_KEY
+  #configmap, amely tárolja az S3 URL-t és a bucketet.
+  connectionConfigMapName: s3-data
+  urlKey: URL
+  bucketKey: bucket
+

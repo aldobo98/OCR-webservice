@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocr-webservice
+spec:
+  selector:
+    matchLabels:
+      app: ocr-webservice
+  template:
+    metadata:
+      labels:
+        app: ocr-webservice
+    spec:
+      containers:
+        - name: ocr-webservice
+          image: vitezalexandra/ocr-react-webservice:{{.Values.env.APP_VERSION}}
+          env:
+            - name: AWS_ENDPOINT_URL
+              valuefrom:
+                configMapKeyRef:
+                  name: {{.Values.s3.connectionConfigMapName}}
+                  key: {{.Values.s3.urlKey}}
+            - name: BUCKET
+              valuefrom:
+                configMapKeyRef:
+                  name: {{.Values.s3.connectionConfigMapName}}
+                  key: {{.Values.s3.bucketKey}}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{.Values.s3.accessSecretName}}
+                  key: {{.Values.s3.accessKeyKey}}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{.Values.s3.accessSecretName}}
+                  key: {{.Values.s3.secretAccessKeyKey}}
