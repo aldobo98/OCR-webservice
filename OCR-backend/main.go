@@ -22,7 +22,7 @@ func main() {
 	}
 
 	//Serve already built frontend
-	fs := http.FileServer(http.Dir("../OCR-frontend/dist"))
+	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 
 	//A presigned URL requestet a /api/uploadurl endpoint fogja kiszolgálni
