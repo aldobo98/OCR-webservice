@@ -4,7 +4,7 @@ env:
 
 s3:
   #Secret, amiben benne van az S3 access key és secret access key.
-  accessSecretName: s3-credentals
+  accessSecretName: s3-credentials
   #A két kulcsérték, amiben az accessKey és a secretAccessKey található. A default értékek azok, amiket az S3 is defaultból megad.
   accessKeyKey: AWS_ACCESS_KEY_ID
   secretAccessKeyKey: AWS_SECRET_ACCESS_KEY
