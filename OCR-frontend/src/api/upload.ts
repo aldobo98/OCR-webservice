@@ -15,7 +15,7 @@ export interface GetUploadUrlResponse {
 
 export async function uploadImage(request: GetUploadUrlRequest, file: File): Promise<string> {
     //Presigned POST linket elkérem a backendtől
-    const response = await fetch("/api/uploadurl", {
+    const response = await fetch("/api/jobs", {
         method: "POST",
         headers: {
             "Content-type": "application/json",
