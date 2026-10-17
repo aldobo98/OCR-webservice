@@ -21,9 +21,6 @@ type AWS_S3 struct {
 	region        string
 }
 
-const SA_ID_ENV = "SA_ID"
-const S3_ENDPOINT_ENV = "AWS_ENDPOINT_URL"
-
 const VARIABLE_SET_FORMAT = "%v environment variable is set, using its value, %v"
 
 func NewAWS_S3(logger *slog.Logger, endpoint string, bucket string, region string) *AWS_S3 {
@@ -32,12 +29,12 @@ func NewAWS_S3(logger *slog.Logger, endpoint string, bucket string, region strin
 		return nil
 	}
 	s3_endpoint := endpoint
-	if os.Getenv(S3_ENDPOINT_ENV) != "" {
-		logger.Info(fmt.Sprintf(VARIABLE_SET_FORMAT, S3_ENDPOINT_ENV, os.Getenv(S3_ENDPOINT_ENV)))
-		s3_endpoint = os.Getenv(S3_ENDPOINT_ENV)
+	if os.Getenv("AWS_ENDPOINT_URL") != "" {
+		logger.Info(fmt.Sprintf(VARIABLE_SET_FORMAT, "AWS_ENDPOINT_URL", os.Getenv("AWS_ENDPOINT_URL")))
+		s3_endpoint = os.Getenv("AWS_ENDPOINT_URL")
 	}
 	if s3_endpoint == "" {
-		logger.Error("S3 endpoint must be specified, please specify endpoint or set environment variable " + S3_ENDPOINT_ENV + ".")
+		logger.Error("S3 endpoint must be specified, please specify endpoint or set environment variable AWS_ENDPOINT_URL.")
 	}
 	if region == "" {
 		logger.Info("Region is not passed, setting default value us-east-1")
