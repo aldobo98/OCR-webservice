@@ -61,6 +61,6 @@ spec:
                   key: {{.Values.database.databaseKey}}
             - name: DB_PASSWORD
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{.Values.database.credentialSecretName}}
                   key: {{.Values.database.passwordKey}}
