@@ -20,12 +20,12 @@ spec:
               Protocol: TCP
           env:
             - name: AWS_ENDPOINT_URL
-              valuefrom:
+              valueFrom:
                 configMapKeyRef:
                   name: {{.Values.s3.connectionConfigMapName}}
                   key: {{.Values.s3.urlKey}}
             - name: BUCKET
-              valuefrom:
+              valueFrom:
                 configMapKeyRef:
                   name: {{.Values.s3.connectionConfigMapName}}
                   key: {{.Values.s3.bucketKey}}
@@ -40,27 +40,27 @@ spec:
                   name: {{.Values.s3.accessSecretName}}
                   key: {{.Values.s3.secretAccessKeyKey}}
             - name: DB_HOST
-              valuefrom:
+              valueFrom:
                 configMapKeyRef:
                   name: {{.Values.database.connectionConfigMapName}}
                   key: {{.Values.database.urlKey}}
             - name: DB_PORT
-              valuefrom:
+              valueFrom:
                 configMapKeyRef:
                   name: {{.Values.database.connectionConfigMapName}}
                   key: {{.Values.database.portKey}}
             - name: DB_USER
-              valuefrom:
+              valueFrom:
                 configMapKeyRef:
                   name: {{.Values.database.connectionConfigMapName}}
                   key: {{.Values.database.userKey}}
             - name: DB_NAME
-              valuefrom:
+              valueFrom:
                 configMapKeyRef:
                   name: {{.Values.database.connectionConfigMapName}}
                   key: {{.Values.database.databaseKey}}
             - name: DB_PASSWORD
-              valuefrom:
+              valueFrom:
                 configMapKeyRef:
                   name: {{.Values.database.credentialSecretName}}
                   key: {{.Values.database.passwordKey}}
