@@ -39,3 +39,28 @@ spec:
                 secretKeyRef:
                   name: {{.Values.s3.accessSecretName}}
                   key: {{.Values.s3.secretAccessKeyKey}}
+            - name: DB_HOST
+              valuefrom:
+                configMapKeyRef:
+                  name: {{.Values.database.connectionConfigMapName}}
+                  key: {{.Values.database.urlKey}}
+            - name: DB_PORT
+              valuefrom:
+                configMapKeyRef:
+                  name: {{.Values.database.connectionConfigMapName}}
+                  key: {{.Values.database.portKey}}
+            - name: DB_USER
+              valuefrom:
+                configMapKeyRef:
+                  name: {{.Values.database.connectionConfigMapName}}
+                  key: {{.Values.database.userKey}}
+            - name: DB_NAME
+              valuefrom:
+                configMapKeyRef:
+                  name: {{.Values.database.connectionConfigMapName}}
+                  key: {{.Values.database.databaseKey}}
+            - name: DB_PASSWORD
+              valuefrom:
+                configMapKeyRef:
+                  name: {{.Values.database.credentialSecretName}}
+                  key: {{.Values.database.passwordKey}}

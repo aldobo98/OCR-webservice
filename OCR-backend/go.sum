@@ -1,5 +1,3 @@
-github.com/aldobo98/ocr-common v0.0.0-20261004091746-3f6121f8719b h1:b2m0vUICZzXLM/MKPKkRKYYRLnAtnRdjd0797LWNLZg=
-github.com/aldobo98/ocr-common v0.0.0-20261004091746-3f6121f8719b/go.mod h1:vAm/r7BGCLnx2eDu14c9++rvnE4Jhd7FRfNu7USDA2w=
 github.com/aws/aws-sdk-go-v2 v1.47.1 h1:uOIZnp4PK3ZhKI0dNrJrhTEsLxbpXHTAJlwoS1pvAtw=
 github.com/aws/aws-sdk-go-v2 v1.47.1/go.mod h1:bttEH6JqnUL8LepvDVfdrds/fZ5bCIxzpe3abyUrhDU=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 h1:GPRlPwz40I2B2VrBEASOA3Bi77NyeqejNLkifosX0rs=

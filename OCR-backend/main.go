@@ -9,26 +9,30 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/aldobo98/OCR-backend/handler"
-	"github.com/aldobo98/ocr-common/aws_s3"
+	"github.com/aldobo98/OCR-backend/internal/job"
+	"github.com/aldobo98/OCR-backend/internal/storage/aws_s3"
 )
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	s3_storage := aws_s3.NewAWS_S3(logger, "http://10.8.0.1:31374", "ocr", "")
-	err := s3_storage.Ensurebucket()
+	s3_storage := aws_s3.NewAWS_S3(logger, "", "ocr", "")
+	service, err := job.NewService(s3_storage)
 	if err != nil {
-		logger.Error("Failed to ensure s3 bucket", "error", err)
+		logger.Error("Failed to initialize service", "error", err)
+		return
 	}
+	mux := http.NewServeMux()
 
 	//Serve already built frontend
 	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/", fs)
+	mux.Handle("/", fs)
 
-	//A presigned URL requestet a /api/uploadurl endpoint fogja kiszolgálni
-	http.HandleFunc("/api/uploadurl", handler.CreateJobRequestHandler(logger, s3_storage))
+	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, service))
+	//mux.Handle("GET /api/jobs/{jobID}/uploads", handler.GetUploadUrlHandler(logger, s3_storage))
+	//mux.Handle("GET /api/jobs/{jobID}/downloads", GetDownloadUrl)
+
 	//Start HTTP server in a goroutine
-	s := http.Server{Addr: ":8080"}
+	s := http.Server{Addr: ":8080", Handler: mux}
 	go func() {
 		logger.Info("Server listening on http://:8080")
 		err := s.ListenAndServe()

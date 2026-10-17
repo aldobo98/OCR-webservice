@@ -13,3 +13,14 @@ s3:
   urlKey: URL
   bucketKey: bucket
 
+database:
+  #Secret, amiben benne van az adatbázis felhasználóhoz tartozó jelszó
+  credentialSecretName: sql-credentials
+  #A secretben ezen a kulcson található a jelszó
+  passwordKey: password
+  connectionConfigMapName: sql-data
+  urlKey: URL
+  portKey: port
+  databaseKey: database
+  userKey: user
+
