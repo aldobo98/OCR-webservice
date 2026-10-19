@@ -9,12 +9,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aldobo98/OCR-backend/internal/database/postgresql"
 	"github.com/aldobo98/OCR-backend/internal/job"
 	"github.com/aldobo98/OCR-backend/internal/storage/aws_s3"
 )
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	database := postgresql.NewPostgres(logger, "", "", "", "", "")
+	if database == nil {
+		logger.Error("Failed to create database")
+		return
+	}
 	s3_storage := aws_s3.NewAWS_S3(logger, "", "ocr", "")
 	service, err := job.NewService(s3_storage)
 	if err != nil {
