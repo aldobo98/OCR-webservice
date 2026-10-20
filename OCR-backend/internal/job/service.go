@@ -39,7 +39,7 @@ func createJob(contentType string, logger *slog.Logger, service *Service, databa
 	objectKey := fmt.Sprintf("jobs/%s/input/original.%s", jobID, strings.Split(strings.ReplaceAll(contentType, "}", ""), "/")[1])
 
 	// 3. Adatbázisban elhelyezés
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	err := database.database.CreateRecord(jobID.String(), objectKey, ctx)
 	if err != nil {
