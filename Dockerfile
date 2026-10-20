@@ -10,7 +10,7 @@ COPY OCR-frontend/ .
 RUN npm run build
 
 #Aztán a golangot buildeljük
-FROM golang:1.24 AS backend-build
+FROM golang:1.25 AS backend-build
 
 WORKDIR /OCR-backend
 
