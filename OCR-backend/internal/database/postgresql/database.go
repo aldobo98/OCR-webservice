@@ -95,7 +95,7 @@ func (p *Postgres) Ping() error {
 	return p.db.Ping()
 }
 
-const createRecordQuery = "INSERT INTO %s (id, status, original_object_key) VALUES $1 $2 $3"
+const createRecordQuery = "INSERT INTO %s (id, status, original_object_key) VALUES ($1, $2, $3)"
 
 func (p *Postgres) CreateRecord(jobID string, originalObjectKey string, ctx context.Context) error {
 	query := fmt.Sprintf(createRecordQuery, p.table)
