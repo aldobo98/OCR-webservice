@@ -11,7 +11,7 @@ import (
 
 //HTTP handler függvények
 
-func CreateJobHandler(logger *slog.Logger, service *Service) http.HandlerFunc {
+func CreateJobHandler(logger *slog.Logger, service *Service, database *Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// 1. Kiolvassuk a request tartalmát
 		defer func() {
@@ -36,7 +36,7 @@ func CreateJobHandler(logger *slog.Logger, service *Service) http.HandlerFunc {
 		logger.Info("Message body read", "value", request)
 
 		// 2. Meghívjuk a logikát
-		response := createJob(request.ContentType, logger, service)
+		response := createJob(request.ContentType, logger, service, database, r.Context())
 
 		if response == nil {
 			w.WriteHeader(http.StatusInternalServerError)

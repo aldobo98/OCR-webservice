@@ -16,9 +16,14 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	database := postgresql.NewPostgres(logger, "", "", "", "", "")
+	database := postgresql.NewPostgres(logger, "", "", "", "", "", "")
 	if database == nil {
 		logger.Error("Failed to create database")
+		return
+	}
+	db, err := job.NewDatabase(database)
+	if err != nil {
+		logger.Error("Failed to initialize database", "error", err)
 		return
 	}
 	s3_storage := aws_s3.NewAWS_S3(logger, "", "ocr", "")
@@ -33,7 +38,7 @@ func main() {
 	fs := http.FileServer(http.Dir("./static"))
 	mux.Handle("/", fs)
 
-	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, service))
+	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, service, db))
 	//mux.Handle("GET /api/jobs/{jobID}/uploads", handler.GetUploadUrlHandler(logger, s3_storage))
 	//mux.Handle("GET /api/jobs/{jobID}/downloads", GetDownloadUrl)
 

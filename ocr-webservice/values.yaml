@@ -23,4 +23,5 @@ database:
   portKey: port
   databaseKey: database
   userKey: user
+  tableKey: table
 
