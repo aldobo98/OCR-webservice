@@ -58,3 +58,33 @@ func CreateJobHandler(logger *slog.Logger, service *Service, database *Database)
 		}
 	}
 }
+
+func CreateOcrStartHandler(logger *slog.Logger, service *Service, database *Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jobID := r.PathValue("jobID")
+		//2. Meghívjuk a logikát, hogy updateljük a státuszt
+		responseCode, err := updateJobStatus(jobID, "uploaded", logger, database, r.Context())
+		//Hogyha valami nem jó, vissza kell küldeni a problémát
+		if err != nil {
+			logger.Error("Failed to update status", "error", err)
+			w.WriteHeader(responseCode)
+			return
+		}
+		//Le kell ellenőrizni, hogy az original object tényleg létezik-e
+		//Lekérdezzük az object nevét
+		objectKey, err := getObjectKey(jobID, "original_object_key", database, r.Context())
+		if err != nil || objectKey == "" {
+			logger.Error("Failed to get objectKey", "error", err)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		//Leellenőrizzük, hogy az object az objektumtárolóban van-e
+		existence, err := service.storage.ObjectExists(r.Context(), objectKey)
+		if err != nil || !existence {
+			logger.Error("Failed to verify existence of object", "error", err)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		logger.Info("Image exists and we're ready to start the recognition! YAY")
+	}
+}

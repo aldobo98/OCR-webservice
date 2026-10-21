@@ -2,8 +2,11 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -61,8 +64,28 @@ func createJob(contentType string, logger *slog.Logger, service *Service, databa
 	}
 }
 
-//Storage meghívása
+func getSupportedStatuses() []string {
+	return []string{"created", "uploaded", "queued", "preprocessing", "ocr_processing", "layout_processing", "completed", "failed"}
+}
 
-//Adatbázis műveletek
+func updateJobStatus(jobID string, status string, logger *slog.Logger, database *Database, ctx context.Context) (int, error) {
+	//Validálnunk kell hogy valid a státusz
+	if slices.Index(getSupportedStatuses(), status) == -1 {
+		return http.StatusBadRequest, errors.New("requested new status is not supported")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	//Végrehajtjuk a módosítást az adatbázisban
+	err := database.database.UpdateRecordStatus(jobID, status, ctx)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	return http.StatusOK, nil
+}
 
-//Üzleti szabályok
+func getObjectKey(jobID string, objectKey string, database *Database, ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	//Lekérdezzük az objectet ami az objectKey alatt van
+	return database.database.GetObjectAtKey(jobID, objectKey, ctx)
+}

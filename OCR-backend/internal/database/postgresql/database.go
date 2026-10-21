@@ -102,3 +102,20 @@ func (p *Postgres) CreateRecord(jobID string, originalObjectKey string, ctx cont
 	_, err := p.db.ExecContext(ctx, query, jobID, "created", originalObjectKey)
 	return err
 }
+
+const updateRecordStatusQuery = "UPDATE %s SET status = $1 WHERE id = $2"
+
+func (p *Postgres) UpdateRecordStatus(jobID string, status string, ctx context.Context) error {
+	query := fmt.Sprintf(updateRecordStatusQuery, p.table)
+	_, err := p.db.ExecContext(ctx, query, status, jobID)
+	return err
+}
+
+const getObjectAtKeyQuery = "SELECT $1 FROM %s WHERE id = $2"
+
+func (p *Postgres) GetObjectAtKey(jobID string, objectKey string, ctx context.Context) (string, error) {
+	query := fmt.Sprintf(getObjectAtKeyQuery, p.table)
+	var object string
+	err := p.db.QueryRowContext(ctx, query, objectKey, jobID).Scan(&object)
+	return object, err
+}

@@ -99,3 +99,11 @@ func (storage *AWS_S3) Get_Download_URL(duration int64, objectKey string) (*v4.P
 	}
 	return request, nil
 }
+
+func (storage *AWS_S3) ObjectExists(ctx context.Context, objectKey string) (bool, error) {
+	_, err := storage.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(storage.bucket), Key: aws.String(objectKey)})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}

@@ -39,6 +39,7 @@ func main() {
 	mux.Handle("/", fs)
 
 	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, service, db))
+	mux.Handle("PUT /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, service, db)) //Elkezdjük a feldolgozást
 	//mux.Handle("GET /api/jobs/{jobID}/uploads", handler.GetUploadUrlHandler(logger, s3_storage))
 	//mux.Handle("GET /api/jobs/{jobID}/downloads", GetDownloadUrl)
 
