@@ -50,7 +50,7 @@ export async function uploadImage(request: GetUploadUrlRequest, file: File): Pro
 }
 
 export async function startProcessing(jobID: string) {
-    const response = await fetch(`/api/jobs/${jobID}`,
+    const response = await fetch(`/api/jobs/${jobID}/start`,
         {
             method: "POST",
         }
