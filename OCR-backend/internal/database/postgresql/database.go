@@ -111,11 +111,11 @@ func (p *Postgres) UpdateRecordStatus(jobID string, status string, ctx context.C
 	return err
 }
 
-const getObjectAtKeyQuery = "SELECT $1 FROM %s WHERE id = $2"
+const getObjectAtKeyQuery = "SELECT %s FROM %s WHERE id = $1"
 
 func (p *Postgres) GetObjectAtKey(jobID string, objectKey string, ctx context.Context) (string, error) {
-	query := fmt.Sprintf(getObjectAtKeyQuery, p.table)
+	query := fmt.Sprintf(getObjectAtKeyQuery, objectKey, p.table)
 	var object string
-	err := p.db.QueryRowContext(ctx, query, objectKey, jobID).Scan(&object)
+	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&object)
 	return object, err
 }
