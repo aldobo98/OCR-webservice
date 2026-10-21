@@ -73,6 +73,7 @@ func CreateOcrStartHandler(logger *slog.Logger, service *Service, database *Data
 		//Le kell ellenőrizni, hogy az original object tényleg létezik-e
 		//Lekérdezzük az object nevét
 		objectKey, err := getObjectKey(jobID, "original_object_key", database, r.Context())
+		logger.Info("retrieved objectKey", "value", objectKey)
 		if err != nil || objectKey == "" {
 			logger.Error("Failed to get objectKey", "error", err)
 			w.WriteHeader(http.StatusNotFound)
