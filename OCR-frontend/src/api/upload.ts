@@ -48,3 +48,14 @@ export async function uploadImage(request: GetUploadUrlRequest, file: File): Pro
 
     return data.jobId;
 }
+
+export async function startProcessing(jobID: string) {
+    const response = await fetch(`/api/jobs/${jobID}`,
+        {
+            method: "POST",
+        }
+    );
+    if (!response.ok){
+        throw new Error("Nem sikerült elkezdeni a processzálást!")
+    }
+}

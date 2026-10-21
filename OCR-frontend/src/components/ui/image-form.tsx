@@ -4,7 +4,7 @@ import { Button } from "./button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card"
 import LanguageCombobox from "./language-combobox"
 import React from "react"
-import {uploadImage} from "@/api/upload"
+import {startProcessing, uploadImage} from "@/api/upload"
 
 /*
 type ImageFormProps = {
@@ -36,6 +36,8 @@ export default function ImageForm(){
       const jobId = await uploadImage({contentType: image.type}, image);
       console.log("Image upload was successful!");
       console.log("Job ID: ", jobId);
+      //Tell the backend that we're done
+      await startProcessing(jobId)
     } catch (error) {
       console.error("Image upload failed: ", error)
     }
