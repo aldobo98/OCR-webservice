@@ -3,6 +3,7 @@
 //import money from '../public/money.jpg'
 //import { useState } from 'react';
 import ImageForm from './components/ui/image-form'
+import { Toaster } from "@/components/ui/toast"
 //import ImageCard from './components/ui/image-card';
 
 export function App() {
@@ -20,8 +21,9 @@ export function App() {
       <div>
         <title>Karakterfelismerés</title>
         <h1 className="text-2xl pb-8 pt-8">Karakterfelismerés EasyOCR használatával</h1>
-        <ImageForm></ImageForm>
-      
+        <Toaster>
+          <ImageForm />
+        </Toaster>
       </div>
     </div>
   )
