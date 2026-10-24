@@ -19,3 +19,15 @@ type ObjectUploadResponse struct {
 	URL    string            `json:"url"`
 	Fields map[string]string `json:"fields"`
 }
+
+type ObjectDownloadResponse struct {
+	URL    string              `json:"url"`
+	Method string              `json:"method"`
+	Fields map[string][]string `json:"fields"`
+}
+
+type StartCharacterRecognition struct {
+	JobID       string                 `json:"jobId"`
+	Download    ObjectDownloadResponse `json:"download"`
+	CallBackUrl string                 `json:"callbackUrl"`
+}

@@ -11,7 +11,7 @@ import (
 
 //HTTP handler függvények
 
-func CreateJobHandler(logger *slog.Logger, service *Service, database *Database) http.HandlerFunc {
+func CreateJobHandler(logger *slog.Logger, storage *Storage, database *Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// 1. Kiolvassuk a request tartalmát
 		defer func() {
@@ -36,7 +36,7 @@ func CreateJobHandler(logger *slog.Logger, service *Service, database *Database)
 		logger.Info("Message body read", "value", request)
 
 		// 2. Meghívjuk a logikát
-		response := createJob(request.ContentType, logger, service, database, r.Context())
+		response := createJob(request.ContentType, logger, storage, database, r.Context())
 
 		if response == nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -59,7 +59,7 @@ func CreateJobHandler(logger *slog.Logger, service *Service, database *Database)
 	}
 }
 
-func CreateOcrStartHandler(logger *slog.Logger, service *Service, database *Database) http.HandlerFunc {
+func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jobID := r.PathValue("jobID")
 		//2. Meghívjuk a logikát, hogy updateljük a státuszt
@@ -80,12 +80,26 @@ func CreateOcrStartHandler(logger *slog.Logger, service *Service, database *Data
 			return
 		}
 		//Leellenőrizzük, hogy az object az objektumtárolóban van-e
-		existence, err := service.storage.ObjectExists(r.Context(), objectKey)
+		existence, err := storage.storage.ObjectExists(r.Context(), objectKey)
 		if err != nil || !existence {
 			logger.Error("Failed to verify existence of object", "error", err)
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		logger.Info("Image exists and we're ready to start the recognition! YAY")
+		//Kell egy cloudEvent amit átadhatunk a brokernek
+		event, err := createOcrCloudEvent(objectKey, jobID, storage, logger)
+		if err != nil {
+			logger.Error("Failed to create OCR CloudEvent", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		logger.Info("Generated CloudEvent", "event", event)
+		//Elküldjük az eseményt az eventSinkAddress-re
+		err = sendCloudEvent(r.Context(), event, logger)
+		if err != nil {
+			logger.Error("Failed to send CloudEvent", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		w.WriteHeader(http.StatusAccepted)
 	}
 }

@@ -69,3 +69,5 @@ spec:
                 configMapKeyRef:
                   name: {{.Values.database.connectionConfigMapName}}
                   key: {{.Values.database.tableKey}}
+            - name: BACKEND_URL
+              value: "http://ocr-webservice.ocr.svc.cluster.local:8080"

@@ -27,7 +27,7 @@ func main() {
 		return
 	}
 	s3_storage := aws_s3.NewAWS_S3(logger, "", "ocr", "")
-	service, err := job.NewService(s3_storage)
+	storage, err := job.NewStorage(s3_storage)
 	if err != nil {
 		logger.Error("Failed to initialize service", "error", err)
 		return
@@ -38,10 +38,9 @@ func main() {
 	fs := http.FileServer(http.Dir("./static"))
 	mux.Handle("/", fs)
 
-	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, service, db))
-	mux.Handle("POST /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, service, db)) //Elkezdjük a feldolgozást
-	//mux.Handle("GET /api/jobs/{jobID}/uploads", handler.GetUploadUrlHandler(logger, s3_storage))
-	//mux.Handle("GET /api/jobs/{jobID}/downloads", GetDownloadUrl)
+	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, storage, db))
+	mux.Handle("POST /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, storage, db)) //Elkezdjük a feldolgozást
+	// "POST /api/jobs/{jobID}/ocr" -> itt fogjuk visszakapni az OCR felismerés eredményét
 
 	//Start HTTP server in a goroutine
 	s := http.Server{Addr: ":8080", Handler: mux}

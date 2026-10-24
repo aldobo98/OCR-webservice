@@ -46,7 +46,7 @@ export default function ImageForm(){
       const jobId = await uploadImage({contentType: image.type}, image);
 
       toast.update(toastId, {
-        title: "Objektum feltölte",
+        title: "Objektum feltöltése",
         description: "A feldolgozás indítása folyamatban van.",
         type: "loading",
         timeout: 0,
