@@ -29,13 +29,9 @@ export default function ImageForm(){
   const [language, setLanguage] = React.useState("eng")
   const [image, setImage] = React.useState<File | null>(null)
 
-  const handleSubmit = async (event: React.SubmitEvent) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isSubmitting) return
-
-    if (!image) {
-      return;
-    }
+    if (isSubmitting || !image) return;
 
     setIsSubmitting(true)
 
@@ -64,7 +60,6 @@ export default function ImageForm(){
         type: "success",
         timeout: 5000
       })
-      setIsSubmitting(false)
 
     } catch (error) {
       toast.update(toastId, {
@@ -77,8 +72,9 @@ export default function ImageForm(){
         timeout: 5000
       })
       console.error("Image upload failed: ", error)
+    } finally{
+      setIsSubmitting(false)
     }
-    setIsSubmitting(false)
   };
 
   return (
