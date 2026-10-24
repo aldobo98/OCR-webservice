@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import LanguageCombobox from "./language-combobox"
 import React from "react"
 import {startProcessing, uploadImage} from "@/api/upload"
+import { Toast, useToastManager } from "@/components/ui/toast"
+import { useState } from 'react';
 
 /*
 type ImageFormProps = {
@@ -21,24 +23,58 @@ type ImageFormProps = {
 
 
 export default function ImageForm(){
+  const toast = useToastManager()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [language, setLanguage] = React.useState("eng")
   const [image, setImage] = React.useState<File | null>(null)
 
   const handleSubmit = async (event: React.SubmitEvent) => {
     event.preventDefault();
+    if (isSubmitting) return
 
     if (!image) {
       return;
     }
 
+    setIsSubmitting(true)
+
+    const toastId = toast.add({
+      title: "Feltöltés folyamatban…",
+      description: "Az objektum feltöltése folyamatban van.",
+      type: "loading",
+      timeout: 0,
+    })
+
     try {
       const jobId = await uploadImage({contentType: image.type}, image);
-      console.log("Image upload was successful!");
-      console.log("Job ID: ", jobId);
+
+      toast.update(toastId, {
+        title: "Objektum feltölte",
+        description: "A feldolgozás indítása folyamatban van.",
+        type: "loading",
+        timeout: 0,
+      })
+
       //Tell the backend that we're done
       await startProcessing(jobId)
+      toast.update(toastId, {
+        title: "A feldolgozás megkezdődött!",
+        description: "A karakterfelismerés folyamatban van.",
+        type: "success",
+        timeout: 5000
+      })
+
     } catch (error) {
+      toast.update(toastId, {
+        title: "Hiba történt!",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Ismeretlen hiba történt.",
+        type: "error",
+        timeout: 5000
+      })
       console.error("Image upload failed: ", error)
     }
   };
