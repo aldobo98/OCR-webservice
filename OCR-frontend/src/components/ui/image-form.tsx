@@ -64,6 +64,7 @@ export default function ImageForm(){
         type: "success",
         timeout: 5000
       })
+      setIsSubmitting(false)
 
     } catch (error) {
       toast.update(toastId, {
@@ -77,6 +78,7 @@ export default function ImageForm(){
       })
       console.error("Image upload failed: ", error)
     }
+    setIsSubmitting(false)
   };
 
   return (
