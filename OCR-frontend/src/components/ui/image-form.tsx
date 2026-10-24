@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import LanguageCombobox from "./language-combobox"
 import React from "react"
 import {startProcessing, uploadImage} from "@/api/upload"
-import { Toast, useToastManager } from "@/components/ui/toast"
+import { useToastManager } from "@/components/ui/toast"
 import { useState } from 'react';
 
 /*
