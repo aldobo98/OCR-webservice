@@ -65,7 +65,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 	return func(w http.ResponseWriter, r *http.Request) {
 		jobID := r.PathValue("jobID")
 		//2. Meghívjuk a logikát, hogy updateljük a státuszt
-		responseCode, err := updateJobStatus(jobID, "uploaded", database, r.Context())
+		responseCode, err := updateJobStatus(jobID, "uploaded", database, r.Context(), logger)
 		//Hogyha valami nem jó, vissza kell küldeni a problémát
 		if err != nil {
 			logger.Error("Failed to update status", "error", err)
@@ -97,7 +97,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 		}
 		logger.Info("Generated CloudEvent", "event", event)
 		//Beállítjuk az adatbázisban az új státuszt
-		responseCode, err = updateJobStatus(jobID, "queued", database, r.Context())
+		responseCode, err = updateJobStatus(jobID, "queued", database, r.Context(), logger)
 		if err != nil {
 			logger.Error("Failed to update status", "error", err)
 			w.WriteHeader(responseCode)
@@ -111,7 +111,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 			defer cancel()
 			err = databaseModifWithRetry(r.Context(), func() error {
 				return database.UpdateFailedStatusAndErrorMessage(jobID, "Failed to send CloudEvent to EventSink", ctx_)
-			})
+			}, logger)
 			if err != nil {
 				logger.Error("Failed to set failed status and error message in database", "error", err)
 			}

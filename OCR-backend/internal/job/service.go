@@ -59,7 +59,7 @@ func isRetryAbleDBError(err error) bool {
 
 // databaseModifWithRetry azokat az adatbázis-műveleteket próbálja újra, amelyek nem adatelőhívást, hanem adatmódosítást hajtanak végre.
 // Ez nem az idempotencia kezelésére készül, hanem a szükséges művelet végrehajtása során keletkező hibák miatt történő újrapróbálás.
-func databaseModifWithRetry(ctx context.Context, operation func() error) error {
+func databaseModifWithRetry(ctx context.Context, operation func() error, logger *slog.Logger) error {
 	const maxAttempts = 5
 	delay := 100 * time.Millisecond
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -68,7 +68,9 @@ func databaseModifWithRetry(ctx context.Context, operation func() error) error {
 			return err
 		}
 		//Ha hiba nélkül lefutott, akkor visszatérünk a nil hibával
+		logger.Info("Most fogom meghívni az adatbázis műveletet")
 		err := operation()
+		logger.Info("Az adatbázis művelet után logolok")
 		if err == nil {
 			return nil
 		}
@@ -133,7 +135,7 @@ func createJob(contentType string, logger *slog.Logger, storage *Storage, databa
 	// 3. Adatbázisban elhelyezés
 	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	err := databaseModifWithRetry(ctx, func() error { return database.CreateRecord(jobID.String(), objectKey, ctx_) })
+	err := databaseModifWithRetry(ctx, func() error { return database.CreateRecord(jobID.String(), objectKey, ctx_) }, logger)
 	if err != nil {
 		logger.Error("Failed to create database entry", "error", err)
 		return nil
@@ -193,7 +195,7 @@ func validStatusChange(current string, goal string) bool {
 	return true
 }
 
-func updateJobStatus(jobID string, status string, database *Database, ctx context.Context) (int, error) {
+func updateJobStatus(jobID string, status string, database *Database, ctx context.Context, logger *slog.Logger) (int, error) {
 	//Validálnunk kell hogy valid a státusz
 	if slices.Index(getSupportedStatuses(), status) == -1 {
 		return http.StatusBadRequest, errors.New("requested new status is not supported")
@@ -215,7 +217,7 @@ func updateJobStatus(jobID string, status string, database *Database, ctx contex
 	ctx_, cancel = context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	//Végrehajtjuk a módosítást az adatbázisban
-	err = databaseModifWithRetry(ctx, func() error { return database.UpdateRecordStatus(jobID, status, ctx_) })
+	err = databaseModifWithRetry(ctx, func() error { return database.UpdateRecordStatus(jobID, status, ctx_) }, logger)
 
 	if err != nil {
 		return http.StatusInternalServerError, err
