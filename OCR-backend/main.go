@@ -40,7 +40,7 @@ func main() {
 
 	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, storage, db))
 	mux.Handle("POST /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, storage, db)) //Elkezdjük a feldolgozást
-	// "POST /api/jobs/{jobID}/ocr" -> itt fogjuk visszakapni az OCR felismerés eredményét
+	// "POST /internal/jobs/callback" -> itt fogjuk visszakapni az OCR felismerés eredményét
 
 	//Start HTTP server in a goroutine
 	s := http.Server{Addr: ":8080", Handler: mux}

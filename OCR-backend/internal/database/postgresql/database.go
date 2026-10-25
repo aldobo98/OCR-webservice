@@ -119,3 +119,20 @@ func (p *Postgres) GetObjectAtKey(jobID string, objectKey string, ctx context.Co
 	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&object)
 	return object, err
 }
+
+const getRecordStatusQuery = "SELECT status FROM %s WHERE id = $1"
+
+func (p *Postgres) GetRecordStatus(jobID string, ctx context.Context) (string, error) {
+	query := fmt.Sprintf(getRecordStatusQuery, p.table)
+	var status string
+	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&status)
+	return status, err
+}
+
+const setFailedAndMessage = "UPDATE %s SET status = 'failed' , error_message = $1 WHERE id = $2"
+
+func (p *Postgres) UpdateFailedStatusAndErrorMessage(jobID, errorMessage string, ctx context.Context) error {
+	query := fmt.Sprintf(setFailedAndMessage, p.table)
+	_, err := p.db.ExecContext(ctx, query, errorMessage, jobID)
+	return err
+}
