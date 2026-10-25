@@ -30,12 +30,12 @@ type Database struct {
 
 func NewStorage(storage storage.Storage) (*Storage, error) {
 	err := storage.EnsureBucket()
-	return &Storage{}, err
+	return &Storage{Storage: storage}, err
 }
 
 func NewDatabase(database database.Database) (*Database, error) {
 	err := database.Ping()
-	return &Database{}, err
+	return &Database{Database: database}, err
 }
 
 func isRetryAbleDBError(err error) bool {
