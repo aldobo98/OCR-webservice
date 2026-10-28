@@ -127,6 +127,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 
 func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Info("Callback arrived!")
 		// 1. Kiolvassuk a request tartalmát
 		defer func() {
 			err := r.Body.Close()
@@ -159,6 +160,8 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			write_callback_response(response, &w, logger)
 			return
 		}
+
+		logger.Info("Callback request data", "data", response)
 		jobID := request.JobID
 
 		//Itt már minden valid, csak csináljuk a csinálnivalót
