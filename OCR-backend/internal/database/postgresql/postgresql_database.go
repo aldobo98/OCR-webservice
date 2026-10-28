@@ -52,19 +52,19 @@ func NewPostgres(host string, port string, user string, password string, dbname 
 		return nil, errors.New("no database port specified")
 	}
 	database_user := getValueBasedOnPriority(user, user_env)
-	if database_user != "" {
+	if database_user == "" {
 		return nil, errors.New("no database user specified")
 	}
 	database_password := getValueBasedOnPriority(password, password_env)
-	if database_password != "" {
+	if database_password == "" {
 		return nil, errors.New("no database password specified")
 	}
 	database_name := getValueBasedOnPriority(dbname, dbName_env)
-	if database_name != "" {
+	if database_name == "" {
 		return nil, errors.New("no database name is specified")
 	}
 	database_table := getValueBasedOnPriority(table, table_env)
-	if database_table != "" {
+	if database_table == "" {
 		return nil, errors.New("no database table is specified")
 	}
 
