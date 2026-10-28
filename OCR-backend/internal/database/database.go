@@ -7,6 +7,8 @@ type Database interface {
 	UpdateRecordStatus(jobID string, status string, ctx context.Context) error
 	GetRecordStatus(jobID string, ctx context.Context) (string, error)
 	GetObjectAtKey(jobID string, objectKey string, ctx context.Context) (string, error)
-	UpdateFailedStatusAndErrorMessage(jobID, errorMessage string, ctx context.Context) error
+	UpdateFailedStatusAndErrorMessage(jobID string, errorMessage string, ctx context.Context) error
+	UpdateRecordAtKey(jobID string, objectKey string, value string, ctx context.Context) error
+	UpdateCompletedStatusAndResults(jobID string, data string, objectKey string, ctx context.Context) error
 	Ping() error
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -59,7 +58,7 @@ func isRetryAbleDBError(err error) bool {
 
 // databaseModifWithRetry azokat az adatbázis-műveleteket próbálja újra, amelyek nem adatelőhívást, hanem adatmódosítást hajtanak végre.
 // Ez nem az idempotencia kezelésére készül, hanem a szükséges művelet végrehajtása során keletkező hibák miatt történő újrapróbálás.
-func databaseModifWithRetry(ctx context.Context, operation func() error, logger *slog.Logger) error {
+func databaseModifWithRetry(ctx context.Context, operation func() error) error {
 	const maxAttempts = 5
 	delay := 100 * time.Millisecond
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -68,9 +67,7 @@ func databaseModifWithRetry(ctx context.Context, operation func() error, logger 
 			return err
 		}
 		//Ha hiba nélkül lefutott, akkor visszatérünk a nil hibával
-		logger.Info("Most fogom meghívni az adatbázis műveletet")
 		err := operation()
-		logger.Info("Az adatbázis művelet után logolok")
 		if err == nil {
 			return nil
 		}
@@ -125,7 +122,7 @@ func databaseQueryWithRetry(ctx context.Context, operation func() (string, error
 	return "", errors.New("unexpected end of database retry loop")
 }
 
-func createJob(contentType string, logger *slog.Logger, storage *Storage, database *Database, ctx context.Context) *dto.CreateJobResponse {
+func createJob(contentType string, storage *Storage, database *Database, ctx context.Context) (*dto.CreateJobResponse, error) {
 	// 1. Egyedi azonosító létrehozása
 	jobID := uuid.New()
 
@@ -133,18 +130,17 @@ func createJob(contentType string, logger *slog.Logger, storage *Storage, databa
 	objectKey := fmt.Sprintf("jobs/%s/input/original.%s", jobID, strings.Split(strings.ReplaceAll(contentType, "}", ""), "/")[1])
 
 	// 3. Adatbázisban elhelyezés
-	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
+	//TODO: Idempotencia? Ha már létezik a job, de hiba történt, és újrapróbálja a frontend??
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	err := databaseModifWithRetry(ctx, func() error { return database.CreateRecord(jobID.String(), objectKey, ctx_) }, logger)
+	err := databaseModifWithRetry(ctx, func() error { return database.CreateRecord(jobID.String(), objectKey, ctx) })
 	if err != nil {
-		logger.Error("Failed to create database entry", "error", err)
-		return nil
+		return nil, err
 	}
 	// 4. presigned upload URL generálása
 	presignedRequest, err := storage.Get_Upload_URL(60, objectKey)
 	if err != nil {
-		logger.Error("Failed to create presigned upload URL", "error", err)
-		return nil
+		return nil, err
 	}
 	return &dto.CreateJobResponse{
 		JobID: jobID.String(),
@@ -152,7 +148,7 @@ func createJob(contentType string, logger *slog.Logger, storage *Storage, databa
 			URL:    presignedRequest.URL,
 			Fields: presignedRequest.Values,
 		},
-	}
+	}, nil
 }
 
 func getSupportedStatuses() []string {
@@ -195,41 +191,50 @@ func validStatusChange(current string, goal string) bool {
 	return true
 }
 
-func updateJobStatus(jobID string, status string, database *Database, ctx context.Context, logger *slog.Logger) (int, error) {
+// updateJobStatus mostmár használható mindenféle status módosítására, át kell adni az adatbázis módosító függvényt.
+// A függvénynek mi adjuk meg a kontextust, hogy ne kelljen mindenféle random helyen contextet készíteni.
+func updateJobStatus(jobID string, status string, database *Database, ctx context.Context, operation func(context.Context) error) error {
 	//Validálnunk kell hogy valid a státusz
 	if slices.Index(getSupportedStatuses(), status) == -1 {
-		return http.StatusBadRequest, errors.New("requested new status is not supported")
+		return errors.New("requested new status is not supported")
 	}
 	//Le kell kérdezni a jelenlegi státuszt, és ellenőrizni kell, hogy azt beállíthatom-e, amit szeretnék
 	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	currentStatus, err := databaseQueryWithRetry(ctx, func() (string, error) { return database.GetRecordStatus(jobID, ctx_) })
+	currentStatus, err := databaseQueryWithRetry(ctx_, func() (string, error) { return database.GetRecordStatus(jobID, ctx_) })
 	if currentStatus == status {
 		//Idempotencia!
-		return http.StatusOK, nil
+		return nil
 	}
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return err
 	}
 	if !validStatusChange(currentStatus, status) {
-		return http.StatusBadRequest, errors.New("requested new status is not a valid change")
+		return errors.New("requested new status is not a valid change")
 	}
 	ctx_, cancel = context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	//Végrehajtjuk a módosítást az adatbázisban
-	err = databaseModifWithRetry(ctx, func() error { return database.UpdateRecordStatus(jobID, status, ctx_) }, logger)
+	return databaseModifWithRetry(ctx, func() error { return operation(ctx_) })
+}
 
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-	return http.StatusOK, nil
+func queryJobValue(jobID string, database *Database, ctx context.Context, operation func(context.Context) (string, error)) (string, error) {
+	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return databaseQueryWithRetry(ctx_, func() (string, error) { return operation(ctx_) })
+}
+
+func updateJobValue(jobID string, database *Database, ctx context.Context, operation func(context.Context) error) error {
+	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return databaseModifWithRetry(ctx_, func() error { return operation(ctx_) })
 }
 
 func getObjectKey(jobID string, objectKey string, database *Database, ctx context.Context) (string, error) {
-	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	//Lekérdezzük az objectet ami az objectKey alatt van
-	return databaseQueryWithRetry(ctx, func() (string, error) { return database.GetObjectAtKey(jobID, objectKey, ctx_) })
+	return databaseQueryWithRetry(ctx, func() (string, error) { return database.GetObjectAtKey(jobID, objectKey, ctx) })
 }
 
 func createOcrCloudEvent(objectPath string, jobID string, storage *Storage) (event.Event, error) {

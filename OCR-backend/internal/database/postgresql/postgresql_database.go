@@ -5,19 +5,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func getEnvironmentVariable(name string, logger *slog.Logger) string {
+func getEnvironmentVariable(name string) string {
 	if os.Getenv(name) != "" {
-		logger.Info(fmt.Sprintf("Environment variable %s is set, using it's value", name), "value", os.Getenv(name))
 		return os.Getenv(name)
 	}
-	logger.Info(fmt.Sprintf("Environment variable %s is unset", name))
 	return ""
 }
 
@@ -28,14 +25,9 @@ func choosePriority(p1 string, p2 string) string {
 	return p2
 }
 
-func getValueBasedOnPriority(argument string, env_variable string, logger *slog.Logger, error_message string) (string, error) {
-	env_value := getEnvironmentVariable(env_variable, logger)
-	final_value := choosePriority(env_value, argument)
-	if final_value == "" {
-		logger.Error(error_message)
-		return "", errors.New("empty values")
-	}
-	return final_value, nil
+func getValueBasedOnPriority(argument string, env_variable string) string {
+	env_value := getEnvironmentVariable(env_variable)
+	return choosePriority(env_value, argument)
 }
 
 type Postgres struct {
@@ -49,38 +41,36 @@ const user_env = "DB_USER"
 const password_env = "DB_PASSWORD"
 const dbName_env = "DB_NAME"
 const table_env = "DB_TABLE"
-const missing_variables = "No %s argument supplied and %s environment variable is unset, please specify one"
 
-func NewPostgres(logger *slog.Logger, host string, port string, user string, password string, dbname string, table string) *Postgres {
-	database_host, err := getValueBasedOnPriority(host, host_env, logger, fmt.Sprintf(missing_variables, "host", host_env))
-	if err != nil {
-		return nil
+func NewPostgres(host string, port string, user string, password string, dbname string, table string) (*Postgres, error) {
+	database_host := getValueBasedOnPriority(host, host_env)
+	if database_host == "" {
+		return nil, errors.New("no database host specified")
 	}
-	database_port, err := getValueBasedOnPriority(port, port_env, logger, fmt.Sprintf(missing_variables, "port", port_env))
-	if err != nil {
-		return nil
+	database_port := getValueBasedOnPriority(port, port_env)
+	if database_port == "" {
+		return nil, errors.New("no database port specified")
 	}
-	database_user, err := getValueBasedOnPriority(user, user_env, logger, fmt.Sprintf(missing_variables, "user", user_env))
-	if err != nil {
-		return nil
+	database_user := getValueBasedOnPriority(user, user_env)
+	if database_user != "" {
+		return nil, errors.New("no database user specified")
 	}
-	database_password, err := getValueBasedOnPriority(password, password_env, logger, fmt.Sprintf(missing_variables, "password", password_env))
-	if err != nil {
-		return nil
+	database_password := getValueBasedOnPriority(password, password_env)
+	if database_password != "" {
+		return nil, errors.New("no database password specified")
 	}
-	database_name, err := getValueBasedOnPriority(dbname, dbName_env, logger, fmt.Sprintf(missing_variables, "dbname", dbName_env))
-	if err != nil {
-		return nil
+	database_name := getValueBasedOnPriority(dbname, dbName_env)
+	if database_name != "" {
+		return nil, errors.New("no database name is specified")
 	}
-	database_table, err := getValueBasedOnPriority(table, table_env, logger, fmt.Sprintf(missing_variables, "table", table_env))
-	if err != nil {
-		return nil
+	database_table := getValueBasedOnPriority(table, table_env)
+	if database_table != "" {
+		return nil, errors.New("no database table is specified")
 	}
 
 	db, err := sql.Open("pgx", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", database_host, database_port, database_user, database_password, database_name))
 	if err != nil {
-		logger.Error("Failed to open database", "error", err)
-		return nil
+		return nil, err
 	}
 
 	db_sanitized_table := pgx.Identifier{database_table}.Sanitize()
@@ -88,7 +78,7 @@ func NewPostgres(logger *slog.Logger, host string, port string, user string, pas
 	return &Postgres{
 		db:    db,
 		table: db_sanitized_table,
-	}
+	}, nil
 }
 
 func (p *Postgres) Ping() error {
@@ -115,9 +105,12 @@ const getObjectAtKeyQuery = "SELECT %s FROM %s WHERE id = $1"
 
 func (p *Postgres) GetObjectAtKey(jobID string, objectKey string, ctx context.Context) (string, error) {
 	query := fmt.Sprintf(getObjectAtKeyQuery, objectKey, p.table)
-	var object string
+	var object sql.NullString
 	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&object)
-	return object, err
+	if !object.Valid {
+		return "", nil
+	}
+	return object.String, err
 }
 
 const getRecordStatusQuery = "SELECT status FROM %s WHERE id = $1"
@@ -131,8 +124,24 @@ func (p *Postgres) GetRecordStatus(jobID string, ctx context.Context) (string, e
 
 const setFailedAndMessage = "UPDATE %s SET status = 'failed' , error_message = $1 WHERE id = $2"
 
-func (p *Postgres) UpdateFailedStatusAndErrorMessage(jobID, errorMessage string, ctx context.Context) error {
+func (p *Postgres) UpdateFailedStatusAndErrorMessage(jobID string, errorMessage string, ctx context.Context) error {
 	query := fmt.Sprintf(setFailedAndMessage, p.table)
 	_, err := p.db.ExecContext(ctx, query, errorMessage, jobID)
+	return err
+}
+
+const updateRecordAtKeyQuery = "UPDATE %s SET %s = $1 WHERE id = $2"
+
+func (p *Postgres) UpdateRecordAtKey(jobID string, objectKey string, value string, ctx context.Context) error {
+	query := fmt.Sprintf(updateRecordAtKeyQuery, p.table, objectKey)
+	_, err := p.db.ExecContext(ctx, query, value, jobID)
+	return err
+}
+
+const updateCompletedAndResult = "UPDATE %s SET status = 'completed, %s = $1 WHERE id = $2"
+
+func (p *Postgres) UpdateCompletedStatusAndResults(jobID string, data string, objectKey string, ctx context.Context) error {
+	query := fmt.Sprintf(updateCompletedAndResult, p.table, objectKey)
+	_, err := p.db.ExecContext(ctx, query, data, jobID)
 	return err
 }

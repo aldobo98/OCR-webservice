@@ -16,9 +16,9 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	database := postgresql.NewPostgres(logger, "", "", "", "", "", "")
-	if database == nil {
-		logger.Error("Failed to create database")
+	database, err := postgresql.NewPostgres("", "", "", "", "", "")
+	if err != nil {
+		logger.Error("Failed to create database", "error", err)
 		return
 	}
 	db, err := job.NewDatabase(database)
@@ -26,7 +26,11 @@ func main() {
 		logger.Error("Failed to initialize database", "error", err)
 		return
 	}
-	s3_storage := aws_s3.NewAWS_S3(logger, "", "ocr", "")
+	s3_storage, err := aws_s3.NewAWS_S3("", "ocr", "")
+	if err != nil {
+		logger.Error("Failed to initialize object storage", "error", err)
+		return
+	}
 	storage, err := job.NewStorage(s3_storage)
 	if err != nil {
 		logger.Error("Failed to initialize service", "error", err)
@@ -40,7 +44,7 @@ func main() {
 
 	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, storage, db))
 	mux.Handle("POST /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, storage, db)) //Elkezdjük a feldolgozást
-	// "POST /internal/jobs/callback" -> itt fogjuk visszakapni az OCR felismerés eredményét
+	mux.Handle("POST /internal/jobs/callback", job.CreateCallBackHandler(logger, storage, db)) //Itt fognak visszajelezni a knative function-ok
 
 	//Start HTTP server in a goroutine
 	s := http.Server{Addr: ":8080", Handler: mux}
