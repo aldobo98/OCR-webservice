@@ -190,7 +190,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 				if re != "" {
 					//Ki kell nyerni, amire szeretnénk download linket: original vagy preprocess
 					//Nem kell ellenőrizgetni semmit, már valid a request
-					path, err := queryJobValue(jobID, database, r.Context(), func(_ctx context.Context) (string, error) {
+					path, err := queryJobValue(r.Context(), func(_ctx context.Context) (string, error) {
 						return database.GetObjectAtKey(jobID, fmt.Sprintf("%s_object_key", re), _ctx)
 					})
 					if err != nil {
@@ -215,7 +215,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 					//A request valid volt, nem kell adatbázist lekérdezni, és a path-ot le kell generálni
 					path := fmt.Sprintf("jobs/%s/input/preprocessed", jobID)
 					//Be kell tenni az adatbázisba
-					err := updateJobValue(jobID, database, r.Context(), func(_ctx context.Context) error {
+					err := updateJobValue(r.Context(), func(_ctx context.Context) error {
 						return database.UpdateRecordAtKey(jobID, "preprocess_object_key", path, _ctx)
 					})
 					if err != nil {

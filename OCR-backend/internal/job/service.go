@@ -218,13 +218,13 @@ func updateJobStatus(jobID string, status string, database *Database, ctx contex
 	return databaseModifWithRetry(ctx, func() error { return operation(ctx_) })
 }
 
-func queryJobValue(jobID string, database *Database, ctx context.Context, operation func(context.Context) (string, error)) (string, error) {
+func queryJobValue(ctx context.Context, operation func(context.Context) (string, error)) (string, error) {
 	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return databaseQueryWithRetry(ctx_, func() (string, error) { return operation(ctx_) })
 }
 
-func updateJobValue(jobID string, database *Database, ctx context.Context, operation func(context.Context) error) error {
+func updateJobValue(ctx context.Context, operation func(context.Context) error) error {
 	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return databaseModifWithRetry(ctx_, func() error { return operation(ctx_) })
@@ -239,7 +239,7 @@ func getObjectKey(jobID string, objectKey string, database *Database, ctx contex
 
 func createOcrCloudEvent(objectPath string, jobID string, storage *Storage) (event.Event, error) {
 
-	download_url, err := storage.Get_Download_URL(120, objectPath)
+	download_url, err := storage.Get_Download_URL(900, objectPath)
 	if err != nil {
 		return event.Event{}, errors.New("failed to create object download pre-signed URL")
 	}
