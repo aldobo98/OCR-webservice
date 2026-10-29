@@ -1,6 +1,6 @@
 env:
   #APP_VERSION tartalmazza a git commit SHA-t, amit a docker image buildelésére, majd a podban tagelésre fogunk használni.
-  APP_VERSION: c80e5c6396cf276df6acc780f07b62bffdd3c510
+  APP_VERSION: ba6ff905bfeb232a081026fe07fae24d1100953a
 
 s3:
   #Secret, amiben benne van az S3 access key és secret access key.
