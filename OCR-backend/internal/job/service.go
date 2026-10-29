@@ -187,6 +187,8 @@ func validStatusChange(current string, goal string) bool {
 		if goal != "completed" {
 			return false
 		}
+	case "completed":
+		return false
 	}
 	return true
 }
