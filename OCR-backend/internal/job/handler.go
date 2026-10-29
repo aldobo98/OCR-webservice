@@ -262,7 +262,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 				return database.UpdateCompletedStatusAndResults(jobID, request.Data, objectKey, _ctx)
 			})
 			if err != nil {
-				logger.Error("Failed to update database with completed status and data")
+				logger.Error("Failed to update database with completed status and data", "error", err)
 				response.Message = "Failed to update database with completed status and data"
 				w.WriteHeader(http.StatusInternalServerError)
 				write_callback_response(response, &w, logger)
