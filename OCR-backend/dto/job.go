@@ -1,5 +1,7 @@
 package dto
 
+import "encoding/json"
+
 // API formátumok gyűjtőhelye
 
 type CreateJobRequest struct {
@@ -34,12 +36,12 @@ type StartCharacterRecognition struct {
 
 // A knative függvények ezen a requesten keresztül fognak dolgokat kérni a backendtől
 type CallbackRequest struct {
-	JobID        string        `json:"jobId"`
-	Step         string        `json:"step"`
-	Status       string        `json:"status"`
-	Data         string        `json:"data"`
-	Requests     ObjectRequest `json:"requests"`
-	ErrorMessage string        `json:"error"`
+	JobID        string          `json:"jobId"`
+	Step         string          `json:"step"`
+	Status       string          `json:"status"`
+	Data         json.RawMessage `json:"data"`
+	Requests     ObjectRequest   `json:"requests"`
+	ErrorMessage string          `json:"error"`
 }
 
 type ObjectRequest struct {

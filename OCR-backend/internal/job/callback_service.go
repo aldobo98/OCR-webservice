@@ -22,7 +22,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 	}
 	//a preprocess nem fog completed-et visszaküldeni
 	if request.Status == "completed" {
-		if request.Data == "" {
+		if len(request.Data) == 0 || string(request.Data) == "null" {
 			return errors.New("when OCR processing or Layout processing is completed, result data is mandatory")
 		}
 	}

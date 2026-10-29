@@ -1,6 +1,9 @@
 package database
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 type Database interface {
 	CreateRecord(jobID string, originalObjectKey string, ctx context.Context) error
@@ -9,6 +12,6 @@ type Database interface {
 	GetObjectAtKey(jobID string, objectKey string, ctx context.Context) (string, error)
 	UpdateFailedStatusAndErrorMessage(jobID string, errorMessage string, ctx context.Context) error
 	UpdateRecordAtKey(jobID string, objectKey string, value string, ctx context.Context) error
-	UpdateCompletedStatusAndResults(jobID string, data string, objectKey string, ctx context.Context) error
+	UpdateCompletedStatusAndResults(jobID string, data json.RawMessage, objectKey string, ctx context.Context) error
 	Ping() error
 }

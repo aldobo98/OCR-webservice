@@ -3,6 +3,7 @@ package postgresql
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -140,7 +141,7 @@ func (p *Postgres) UpdateRecordAtKey(jobID string, objectKey string, value strin
 
 const updateCompletedAndResult = "UPDATE %s SET status = 'completed, %s = $1 WHERE id = $2"
 
-func (p *Postgres) UpdateCompletedStatusAndResults(jobID string, data string, objectKey string, ctx context.Context) error {
+func (p *Postgres) UpdateCompletedStatusAndResults(jobID string, data json.RawMessage, objectKey string, ctx context.Context) error {
 	query := fmt.Sprintf(updateCompletedAndResult, p.table, objectKey)
 	_, err := p.db.ExecContext(ctx, query, data, jobID)
 	return err
