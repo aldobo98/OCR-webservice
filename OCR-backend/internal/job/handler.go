@@ -236,7 +236,8 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 				}
 			}
 			//Fel kell venni az adatbázisba a státuszváltozást
-			err := updateJobStatus(jobID, request.Status, database, r.Context(), func(_ctx context.Context) error { return database.UpdateRecordStatus(jobID, request.Status, _ctx) })
+			//Nem a "starting" statuszt akarom felvenni, hanem hogy az adott lépésben vagyok!
+			err := updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error { return database.UpdateRecordStatus(jobID, request.Status, _ctx) })
 			if err != nil {
 				logger.Error("Failed to update database", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
