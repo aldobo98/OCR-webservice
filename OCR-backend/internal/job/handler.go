@@ -161,7 +161,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			return
 		}
 
-		logger.Info("Callback request data", "data", response)
+		logger.Info("Callback request data", "data", request)
 		jobID := request.JobID
 
 		//Itt már minden valid, csak csináljuk a csinálnivalót
