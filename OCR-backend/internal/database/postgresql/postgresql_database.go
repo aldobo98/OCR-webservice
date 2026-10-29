@@ -139,7 +139,7 @@ func (p *Postgres) UpdateRecordAtKey(jobID string, objectKey string, value strin
 	return err
 }
 
-const updateCompletedAndResult = "UPDATE %s SET status = 'completed, %s = $1 WHERE id = $2"
+const updateCompletedAndResult = "UPDATE %s SET status = 'completed', %s = $1 WHERE id = $2"
 
 func (p *Postgres) UpdateCompletedStatusAndResults(jobID string, data json.RawMessage, objectKey string, ctx context.Context) error {
 	query := fmt.Sprintf(updateCompletedAndResult, p.table, objectKey)
