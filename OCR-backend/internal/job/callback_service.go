@@ -35,7 +35,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 				return errors.New("read requests should be either for original or for preprocess object")
 			}
 			objectKey := fmt.Sprintf("%s_object_key", re)
-			ret, err := queryJobValue(request.JobID, db, ctx, func(_ctx context.Context) (string, error) {
+			ret, err := queryJobValue(ctx, func(_ctx context.Context) (string, error) {
 				return db.GetObjectAtKey(request.JobID, objectKey, _ctx)
 			})
 			if err != nil {
@@ -60,7 +60,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 				return errors.New("the requested object cannot be written")
 			}
 			//Ha létezik az adatbázisban, akkor már valaki írta -> nem írjuk felül
-			ret, err := queryJobValue(request.JobID, db, ctx, func(_ctx context.Context) (string, error) {
+			ret, err := queryJobValue(ctx, func(_ctx context.Context) (string, error) {
 				return db.GetObjectAtKey(request.JobID, "preprocess_object_key", _ctx)
 			})
 			if err != nil {
