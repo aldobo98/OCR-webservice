@@ -162,6 +162,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			write_callback_response(response, &w, logger)
 			return
 		}
+		logger.Info("Callback request returncode", "returncode", convertToReturnCode(callres))
 		if callres == CallbackIgnored {
 			//Idempotencia, nem akarunk ezzel tovább foglalkozni
 			logger.Info("Idempotent call is sent back", "code", convertToReturnCode(callres))

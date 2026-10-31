@@ -103,7 +103,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 			key = "layout_results"
 		}
 		existingData, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return db.GetObjectAtKey(request.JobID, key, _ctx) })
-		logger.Info("")
+		logger.Info("getObjectAtKey", "result", existingData)
 		if err != nil {
 			return CallbackError, fmt.Errorf("failed to validate existing data for record id %s, error %s", request.JobID, err)
 		}
@@ -112,6 +112,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 			logger.Info("RETURNING IDEMPOTENT COMPLETED CALLBACK")
 			return CallbackIgnored, nil
 		}
+		logger.Info("Not idempotent change")
 	}
 	//ha van objectRequest
 	if request.Requests != (dto.ObjectRequest{}) {
