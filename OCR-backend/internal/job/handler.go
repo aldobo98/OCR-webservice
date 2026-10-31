@@ -157,13 +157,14 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 		callres, err := validate_callback_request(request, database, storage, r.Context())
 		if err != nil {
 			w.WriteHeader(convertToReturnCode(callres))
-			logger.Error("Callback request was invalid", "error", err)
+			logger.Error("Callback request was invalid", "error", err, "returncode", convertToReturnCode(callres))
 			response.Message = fmt.Sprintf("Callback request validation failed with the following error: %s", err)
 			write_callback_response(response, &w, logger)
 			return
 		}
 		if callres == CallbackIgnored {
 			//Idempotencia, nem akarunk ezzel tovább foglalkozni
+			logger.Info("Idempotent call is sent back", "code", convertToReturnCode(callres))
 			w.WriteHeader(convertToReturnCode(callres))
 			write_callback_response(response, &w, logger)
 			return

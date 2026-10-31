@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"slices"
 
 	"github.com/aldobo98/OCR-backend/dto"
@@ -48,17 +49,24 @@ func getValidStatuses() []string {
 }
 
 func validate_callback_request(request dto.CallbackRequest, db *Database, str *Storage, ctx context.Context) (CallbackResult, error) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	//jobID, step és status kötelező minden esetben
 	if request.JobID == "" || request.Step == "" || request.Status == "" {
+		logger.Error("Missing mandatory fields from callback request")
 		return CallbackInvalid, errors.New("callback request should contain both jobID, step and status")
 	}
+	logger.Info("Mandatory fields are in place in callback message :)")
 
 	//A step és a status csak bizonyos érték lehet
 	if slices.Index(getValidSteps(), request.Step) == -1 {
+		logger.Error("Invalid step in callback request", "invalid", request.Step)
 		return CallbackInvalid, fmt.Errorf("invalid step in callback request: %s, must be one of %s", request.Step, getValidSteps())
 	}
+	logger.Info("Valid step in callback request :)")
 
 	if slices.Index(getValidStatuses(), request.Status) == -1 {
+		logger.Error("Invalid status in callback request", "invalid", request.Status)
 		return CallbackInvalid, fmt.Errorf("invalid status in callback request: %s, must be one of %s", request.Status, getValidStatuses())
 	}
 	//Ha nem létezik a kért JobID, az is probléma
@@ -69,6 +77,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 	if !existence {
 		return Callback404, fmt.Errorf("the requested resource with id %s doesn't exist", request.JobID)
 	}
+	logger.Info("The requested record exists in the database :)")
 
 	//ha failed a status akkor kell errormessage
 	if request.Status == "failed" && request.ErrorMessage == "" {
@@ -76,6 +85,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 	}
 	//a preprocess nem fog completed-et visszaküldeni
 	if request.Status == "completed" {
+		logger.Info("callback with completed status was requested")
 		//preprocessing nem küld vissza completed statust
 		if request.Step == "preprocessing" {
 			return CallbackInvalid, errors.New("preprocessing is not supposed to send back results")
@@ -87,16 +97,19 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 		var key string
 		switch request.Step {
 		case "ocr_request":
+			logger.Info("completed callback with ocr_request arrived")
 			key = "ocr_results"
 		case "layout_processing":
 			key = "layout_results"
 		}
 		existingData, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return db.GetObjectAtKey(request.JobID, key, _ctx) })
+		logger.Info("")
 		if err != nil {
 			return CallbackError, fmt.Errorf("failed to validate existing data for record id %s, error %s", request.JobID, err)
 		}
 		if existingData != "" {
 			//Ez lehet idempotencia, elfogadjuk azt csokolom
+			logger.Info("RETURNING IDEMPOTENT COMPLETED CALLBACK")
 			return CallbackIgnored, nil
 		}
 	}
