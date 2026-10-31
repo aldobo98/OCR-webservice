@@ -147,17 +147,17 @@ func (p *Postgres) UpdateCompletedStatusAndResults(jobID string, data json.RawMe
 	return err
 }
 
-const recordQuery = "SELECT * FROM %s WHERE id = $1"
-
 func (p *Postgres) RecordExists(jobID string, ctx context.Context) (bool, error) {
-	query := fmt.Sprintf(recordQuery, p.table)
-	var object sql.NullString
-	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&object)
-	if !object.Valid || err == pgx.ErrNoRows {
-		return false, nil
-	}
-	if err != pgx.ErrNoRows {
+	var exists bool
+
+	err := p.db.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM jobs WHERE id = $1)`,
+		jobID,
+	).Scan(&exists)
+
+	if err != nil {
 		return false, err
 	}
-	return true, nil
+
+	return exists, nil
 }
