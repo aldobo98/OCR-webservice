@@ -280,7 +280,9 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 				write_callback_response(response, &w, logger)
 				return
 			}
+			logger.Info("Completed callback is sent back with 200OK")
 			w.WriteHeader(http.StatusOK)
+			return
 		}
 	}
 }

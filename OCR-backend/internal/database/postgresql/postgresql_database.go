@@ -143,6 +143,7 @@ const updateCompletedAndResult = "UPDATE %s SET status = 'completed', %s = $1 WH
 
 func (p *Postgres) UpdateCompletedStatusAndResults(jobID string, data json.RawMessage, objectKey string, ctx context.Context) error {
 	query := fmt.Sprintf(updateCompletedAndResult, p.table, objectKey)
+	fmt.Println(query)
 	_, err := p.db.ExecContext(ctx, query, data, jobID)
 	return err
 }
