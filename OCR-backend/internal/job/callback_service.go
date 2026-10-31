@@ -96,7 +96,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 		//Egyébként meg kell nézni, hogy az írni kivánt data objectben már van-e valami, mert ha igen, akkor asszumálhatjuk az idempotenciát
 		var key string
 		switch request.Step {
-		case "ocr_request":
+		case "ocr_processing":
 			logger.Info("completed callback with ocr_request arrived")
 			key = "ocr_results"
 		case "layout_processing":
