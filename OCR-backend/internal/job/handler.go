@@ -76,7 +76,9 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 		}
 		//Le kell ellenőrizni, hogy az original object tényleg létezik-e
 		//Lekérdezzük az object nevét
-		objectKey, err := getObjectKey(jobID, "original_object_key", database, r.Context())
+		objectKey, err := databaseRetry(r.Context(), func(_ctx context.Context) (string, error) {
+			return database.GetObjectAtKey(jobID, "original_object_key", _ctx)
+		})
 		logger.Info("retrieved objectKey", "value", objectKey)
 		if err != nil || objectKey == "" {
 			logger.Error("Failed to get objectKey", "error", err)
@@ -152,16 +154,22 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 		var response dto.CallbackResponse
 
 		//Callback request validálása
-		err = validate_callback_request(request, database, storage, r.Context())
+		callres, err := validate_callback_request(request, database, storage, r.Context())
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(convertToReturnCode(callres))
 			logger.Error("Callback request was invalid", "error", err)
 			response.Message = fmt.Sprintf("Callback request validation failed with the following error: %s", err)
 			write_callback_response(response, &w, logger)
 			return
 		}
+		if callres == CallbackIgnored {
+			//Idempotencia, nem akarunk ezzel tovább foglalkozni
+			w.WriteHeader(convertToReturnCode(callres))
+			write_callback_response(response, &w, logger)
+			return
+		}
 
-		logger.Info("Callback request data", "data", request)
+		logger.Info("Callback request", "request", request)
 		jobID := request.JobID
 
 		//Itt már minden valid, csak csináljuk a csinálnivalót
@@ -190,7 +198,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 				if re != "" {
 					//Ki kell nyerni, amire szeretnénk download linket: original vagy preprocess
 					//Nem kell ellenőrizgetni semmit, már valid a request
-					path, err := queryJobValue(r.Context(), func(_ctx context.Context) (string, error) {
+					path, err := databaseRetry(r.Context(), func(_ctx context.Context) (string, error) {
 						return database.GetObjectAtKey(jobID, fmt.Sprintf("%s_object_key", re), _ctx)
 					})
 					if err != nil {
@@ -206,6 +214,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 						w.WriteHeader(http.StatusInternalServerError)
 						response.Message = "Failed to generate download URL for requested read object"
 						write_callback_response(response, &w, logger)
+						return
 					}
 					response.Read = dto.ObjectDownloadResponse{URL: download_url.URL, Method: download_url.Method, Fields: download_url.SignedHeader}
 				}
@@ -215,8 +224,8 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 					//A request valid volt, nem kell adatbázist lekérdezni, és a path-ot le kell generálni
 					path := fmt.Sprintf("jobs/%s/input/preprocessed", jobID)
 					//Be kell tenni az adatbázisba
-					err := updateJobValue(r.Context(), func(_ctx context.Context) error {
-						return database.UpdateRecordAtKey(jobID, "preprocess_object_key", path, _ctx)
+					_, err := databaseRetry(r.Context(), func(_ctx context.Context) (struct{}, error) {
+						return struct{}{}, database.UpdateRecordAtKey(jobID, "preprocess_object_key", path, _ctx)
 					})
 					if err != nil {
 						logger.Error("Failed to update database at preprocess_object_key", "error", err)

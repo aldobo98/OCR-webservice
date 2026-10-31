@@ -37,120 +37,6 @@ func NewDatabase(database database.Database) (*Database, error) {
 	return &Database{Database: database}, err
 }
 
-func isRetryAbleDBError(err error) bool {
-	//Az adatbázis hibakódjait leellenőrizzük
-	var pgErr *pgconn.PgError
-	//Az nem feltétlen hiba, hogy 0 sort kapunk vissza! Vagy nem feltétlen újrapróbálható.
-	if errors.As(err, &pgErr) {
-		switch pgErr.Code {
-		case "40001": //serialization failure
-			return true
-		case "40P01": //deadlock detected
-			return true
-		}
-	}
-	//Megszűnt kapcsolatra vonatkozó hiba
-	if strings.Contains(err.Error(), "connect: connection refused") {
-		return true
-	}
-	return false
-}
-
-// databaseModifWithRetry azokat az adatbázis-műveleteket próbálja újra, amelyek nem adatelőhívást, hanem adatmódosítást hajtanak végre.
-// Ez nem az idempotencia kezelésére készül, hanem a szükséges művelet végrehajtása során keletkező hibák miatt történő újrapróbálás.
-func databaseModifWithRetry(ctx context.Context, operation func() error) error {
-	const maxAttempts = 5
-	delay := 100 * time.Millisecond
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		if err := ctx.Err(); err != nil {
-			//Itt akkor kapunk errort, ha megszakad a kontextus (pld. bontott kapcsolat), vagy lejárt a timeout.
-			return err
-		}
-		//Ha hiba nélkül lefutott, akkor visszatérünk a nil hibával
-		err := operation()
-		if err == nil {
-			return nil
-		}
-		//Ha van nem újrapróbálható hiba vagy lejárt a próbálkozási ablak
-		if !isRetryAbleDBError(err) || attempt == maxAttempts {
-			return err
-		}
-		//Egyébként újrapróbálkozunk
-		//Kell egy időzítő, ami lejár a delay-t követően
-		timer := time.NewTimer(delay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
-			//Ha lejár az időzítő, akkor kilépünk a select-ből, és a delay megnő.
-		}
-		delay *= 2
-	}
-	return errors.New("unexpected end of database retry loop")
-}
-
-func databaseQueryWithRetry(ctx context.Context, operation func() (string, error)) (string, error) {
-	const maxAttempts = 5
-	delay := 100 * time.Millisecond
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		if err := ctx.Err(); err != nil {
-			//Itt akkor kapunk errort, ha megszakad a kontextus (pld. bontott kapcsolat), vagy lejárt a timeout.
-			return "", err
-		}
-		//Ha hiba nélkül lefutott, akkor visszatérünk a nil hibával
-		result, err := operation()
-		if err == nil {
-			return result, nil
-		}
-		//Ha van nem újrapróbálható hiba vagy lejárt a próbálkozási ablak
-		if !isRetryAbleDBError(err) || attempt == maxAttempts {
-			return result, err
-		}
-		//Egyébként újrapróbálkozunk
-		//Kell egy időzítő, ami lejár a delay-t követően
-		timer := time.NewTimer(delay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return "", ctx.Err()
-		case <-timer.C:
-			//Ha lejár az időzítő, akkor kilépünk a select-ből, és a delay megnő.
-		}
-		delay *= 2
-	}
-	return "", errors.New("unexpected end of database retry loop")
-}
-
-func createJob(contentType string, storage *Storage, database *Database, ctx context.Context) (*dto.CreateJobResponse, error) {
-	// 1. Egyedi azonosító létrehozása
-	jobID := uuid.New()
-
-	// 2. Objektum útvonala
-	objectKey := fmt.Sprintf("jobs/%s/input/original.%s", jobID, strings.Split(strings.ReplaceAll(contentType, "}", ""), "/")[1])
-
-	// 3. Adatbázisban elhelyezés
-	//TODO: Idempotencia? Ha már létezik a job, de hiba történt, és újrapróbálja a frontend??
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	err := databaseModifWithRetry(ctx, func() error { return database.CreateRecord(jobID.String(), objectKey, ctx) })
-	if err != nil {
-		return nil, err
-	}
-	// 4. presigned upload URL generálása
-	presignedRequest, err := storage.Get_Upload_URL(60, objectKey)
-	if err != nil {
-		return nil, err
-	}
-	return &dto.CreateJobResponse{
-		JobID: jobID.String(),
-		Upload: dto.ObjectUploadResponse{
-			URL:    presignedRequest.URL,
-			Fields: presignedRequest.Values,
-		},
-	}, nil
-}
-
 func getSupportedStatuses() []string {
 	return []string{"created", "uploaded", "queued", "preprocessing", "ocr_processing", "layout_processing", "completed", "failed"}
 }
@@ -193,17 +79,98 @@ func validStatusChange(current string, goal string) bool {
 	return true
 }
 
+func isRetryAbleDBError(err error) bool {
+	//Az adatbázis hibakódjait leellenőrizzük
+	var pgErr *pgconn.PgError
+	//Az nem feltétlen hiba, hogy 0 sort kapunk vissza! Vagy nem feltétlen újrapróbálható.
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "40001": //serialization failure
+			return true
+		case "40P01": //deadlock detected
+			return true
+		}
+	}
+	//Megszűnt kapcsolatra vonatkozó hiba
+	if strings.Contains(err.Error(), "connect: connection refused") {
+		return true
+	}
+	return false
+}
+
+func databaseRetry[T any](ctx context.Context, operation func(ctx context.Context) (T, error)) (T, error) {
+	const maxAttempts = 5
+	var result T
+	delay := 100 * time.Millisecond
+	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			//Itt akkor kapunk errort, ha megszakad a kontextus (pld. bontott kapcsolat), vagy lejárt a timeout.
+			return result, err
+		}
+		//Ha hiba nélkül lefutott, akkor visszatérünk a nil hibával
+		result, err := operation(ctx_)
+		if err == nil {
+			return result, nil
+		}
+		//Ha van nem újrapróbálható hiba vagy lejárt a próbálkozási ablak
+		if !isRetryAbleDBError(err) || attempt == maxAttempts {
+			return result, err
+		}
+		//Egyébként újrapróbálkozunk
+		//Kell egy időzítő, ami lejár a delay-t követően
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return result, ctx.Err()
+		case <-timer.C:
+			//Ha lejár az időzítő, akkor kilépünk a select-ből, és a delay megnő.
+		}
+		delay *= 2
+	}
+	return result, errors.New("unexpected end of database retry loop")
+}
+
+func createJob(contentType string, storage *Storage, database *Database, ctx context.Context) (*dto.CreateJobResponse, error) {
+	// 1. Egyedi azonosító létrehozása
+	jobID := uuid.New()
+
+	// 2. Objektum útvonala
+	objectKey := fmt.Sprintf("jobs/%s/input/original.%s", jobID, strings.Split(strings.ReplaceAll(contentType, "}", ""), "/")[1])
+
+	// 3. Adatbázisban elhelyezés
+	//TODO: Idempotencia? Ha már létezik a job, de hiba történt, és újrapróbálja a frontend??
+	_, err := databaseRetry(ctx, func(_ctx context.Context) (struct{}, error) {
+		return struct{}{}, database.CreateRecord(jobID.String(), objectKey, _ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	// 4. presigned upload URL generálása
+	presignedRequest, err := storage.Get_Upload_URL(60, objectKey)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.CreateJobResponse{
+		JobID: jobID.String(),
+		Upload: dto.ObjectUploadResponse{
+			URL:    presignedRequest.URL,
+			Fields: presignedRequest.Values,
+		},
+	}, nil
+}
+
 // updateJobStatus mostmár használható mindenféle status módosítására, át kell adni az adatbázis módosító függvényt.
 // A függvénynek mi adjuk meg a kontextust, hogy ne kelljen mindenféle random helyen contextet készíteni.
-func updateJobStatus(jobID string, status string, database *Database, ctx context.Context, operation func(context.Context) error) error {
+func updateJobStatus(jobID string, status string, database *Database, ctx context.Context, operation func(_ctx context.Context) error) error {
 	//Validálnunk kell hogy valid a státusz
 	if slices.Index(getSupportedStatuses(), status) == -1 {
 		return errors.New("requested new status is not supported")
 	}
 	//Le kell kérdezni a jelenlegi státuszt, és ellenőrizni kell, hogy azt beállíthatom-e, amit szeretnék
-	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	currentStatus, err := databaseQueryWithRetry(ctx_, func() (string, error) { return database.GetRecordStatus(jobID, ctx_) })
+	currentStatus, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return database.GetRecordStatus(jobID, _ctx) })
 	if currentStatus == status {
 		//Idempotencia!
 		return nil
@@ -214,29 +181,9 @@ func updateJobStatus(jobID string, status string, database *Database, ctx contex
 	if !validStatusChange(currentStatus, status) {
 		return errors.New("requested new status is not a valid change")
 	}
-	ctx_, cancel = context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
 	//Végrehajtjuk a módosítást az adatbázisban
-	return databaseModifWithRetry(ctx, func() error { return operation(ctx_) })
-}
-
-func queryJobValue(ctx context.Context, operation func(context.Context) (string, error)) (string, error) {
-	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	return databaseQueryWithRetry(ctx_, func() (string, error) { return operation(ctx_) })
-}
-
-func updateJobValue(ctx context.Context, operation func(context.Context) error) error {
-	ctx_, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	return databaseModifWithRetry(ctx_, func() error { return operation(ctx_) })
-}
-
-func getObjectKey(jobID string, objectKey string, database *Database, ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	//Lekérdezzük az objectet ami az objectKey alatt van
-	return databaseQueryWithRetry(ctx, func() (string, error) { return database.GetObjectAtKey(jobID, objectKey, ctx) })
+	_, err = databaseRetry(ctx, func(_ctx context.Context) (struct{}, error) { return struct{}{}, operation(ctx) })
+	return err
 }
 
 func createOcrCloudEvent(objectPath string, jobID string, storage *Storage) (event.Event, error) {
