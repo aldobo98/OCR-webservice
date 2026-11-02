@@ -14,8 +14,8 @@ export default function ImageForm(){
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const docTypes = [
-    {value: "struct", label: "Struktúrált"},
-    {value: "unstruct", label: "Szöveges"}
+    {value: "structured", label: "Struktúrált"},
+    {value: "unstructured", label: "Szöveges"}
   ]
   const [docType, setDocType] = React.useState("unstruct")
   const [image, setImage] = React.useState<File | null>(null)
@@ -72,8 +72,8 @@ export default function ImageForm(){
     <form onSubmit= {handleSubmit} >
     <Card className="w-full max-w-lg">
       <CardHeader>
-        <CardTitle>Karakterfelismerés</CardTitle>
-        <CardDescription>A karakterfelismeréshez egy dokumentumot feltölteni, és a szöveg típusát kell kiválasztani.</CardDescription>
+        <CardTitle>Szövegfelismerés</CardTitle>
+        <CardDescription>A szövegfelismeréshez egy dokumentumot feltölteni, és a szöveg típusát kell kiválasztani.</CardDescription>
       </CardHeader>
       <CardContent>
           <div className="flex flex-col pb-3">
