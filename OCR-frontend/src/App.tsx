@@ -2,8 +2,9 @@
 //import nobrain from '../public/ nobrain.jpg'
 //import money from '../public/money.jpg'
 //import { useState } from 'react';
+import { useState } from 'react'
 import ImageForm from './components/ui/image-form'
-import { Toaster } from "@/components/ui/toast"
+import JobStatus from './components/ui/job-status';
 //import ImageCard from './components/ui/image-card';
 
 export function App() {
@@ -16,15 +17,20 @@ export function App() {
 
   //const [processing, setProcessing] = useState(false);
 
+  const [jobID, setJobID] = useState<string | null>(null);
+
   return (
     <div className="flex place-content-center gap-5">
       <div>
         <title>Karakterfelismerés</title>
         <h1 className="text-2xl pb-8 pt-8">Karakterfelismerés EasyOCR használatával</h1>
-        <Toaster>
-          <ImageForm />
-        </Toaster>
+          <ImageForm setJobID={setJobID}/>
       </div>
+    {jobID &&(
+      <div>
+        <JobStatus jobID={jobID}/>
+      </div>
+    )}
     </div>
   )
 }
