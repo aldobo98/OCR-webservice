@@ -35,24 +35,11 @@ type StartCharacterRecognition struct {
 	CallBackUrl string                 `json:"callbackUrl"`
 }
 
-// A knative függvények ezen a requesten keresztül fognak dolgokat kérni a backendtől
+// A knative függvények ezen a requesten keresztül kommunikálnak a backenddel
 type CallbackRequest struct {
 	JobID        string          `json:"jobId"`
 	Step         string          `json:"step"`
 	Status       string          `json:"status"`
 	Data         json.RawMessage `json:"data"`
-	Requests     ObjectRequest   `json:"requests"`
 	ErrorMessage string          `json:"error"`
-}
-
-type ObjectRequest struct {
-	Read  string `json:"read"`
-	Write string `json:"write"`
-}
-
-// Válasz a knative függvényeknek, hogyha kell visszaküldeni vmit (presigned URL-eket) a statuscode-n kívül
-type CallbackResponse struct {
-	Read    ObjectDownloadResponse `json:"read"`
-	Write   ObjectUploadResponse   `json:"write"`
-	Message string                 `json:"message"`
 }

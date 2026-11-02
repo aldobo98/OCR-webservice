@@ -3,7 +3,6 @@ package job
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -101,8 +100,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 		}
 		logger.Info("Generated CloudEvent", "event", event)
 		//Beállítjuk az adatbázisban az új státuszt
-		status_to_update = "queued"
-		err = updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error { return database.SetStatus(jobID, status_to_update, _ctx) })
+		err = updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error { return database.SetStatus(jobID, "ocr_processing", _ctx) })
 		if err != nil {
 			logger.Error("Failed to update status", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -151,15 +149,11 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			return
 		}
 
-		var response dto.CallbackResponse
-
 		//Callback request validálása
 		callres, err := validate_callback_request(request, database, storage, r.Context())
 		if err != nil {
-			w.WriteHeader(convertToReturnCode(callres))
 			logger.Error("Callback request was invalid", "error", err, "returncode", convertToReturnCode(callres))
-			response.Message = fmt.Sprintf("Callback request validation failed with the following error: %s", err)
-			write_callback_response(response, &w, logger)
+			w.WriteHeader(convertToReturnCode(callres))
 			return
 		}
 		logger.Info("Callback request returncode", "returncode", convertToReturnCode(callres))
@@ -167,7 +161,6 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			//Idempotencia, nem akarunk ezzel tovább foglalkozni
 			logger.Info("Idempotent call is sent back", "code", convertToReturnCode(callres))
 			w.WriteHeader(convertToReturnCode(callres))
-			write_callback_response(response, &w, logger)
 			return
 		}
 
@@ -178,106 +171,32 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 		switch request.Status {
 		case "failed":
 			//DB update és statuscode visszaküldése
-			status_to_update := "failed"
-			err = updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error {
+			err = updateJobStatus(jobID, "failed", database, r.Context(), func(_ctx context.Context) error {
 				return database.FailWithMessage(jobID, request.ErrorMessage, _ctx)
 			})
 			if err != nil {
 				logger.Error("Failed to update database after knative function reported failure", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
-				response.Message = "Failed to update database with status and error message"
-				write_callback_response(response, &w, logger)
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			return
-		case "starting":
-			//Ha vannak requestek, akkor először le kell generálni a presigned URL-eket
-			objectRequest := request.Requests
-			if objectRequest != (dto.ObjectRequest{}) {
-				//Presigned GET, download request
-				re := objectRequest.Read
-				if re != "" {
-					//Ki kell nyerni, amire szeretnénk download linket: original vagy preprocess
-					//Nem kell ellenőrizgetni semmit, már valid a request
-					path, err := databaseRetry(r.Context(), func(_ctx context.Context) (string, error) {
-						return database.GetStringValue(jobID, fmt.Sprintf("%s_object_key", re), _ctx)
-					})
-					if err != nil {
-						logger.Error("Failed to read path from database", "error", err)
-						w.WriteHeader(http.StatusInternalServerError)
-						response.Message = "Failed to read the path of the requested read object"
-						write_callback_response(response, &w, logger)
-						return
-					}
-					download_url, err := storage.Get_Download_URL(1800, path)
-					if err != nil {
-						logger.Error("Failed to get download URL", "error", err)
-						w.WriteHeader(http.StatusInternalServerError)
-						response.Message = "Failed to generate download URL for requested read object"
-						write_callback_response(response, &w, logger)
-						return
-					}
-					response.Read = dto.ObjectDownloadResponse{URL: download_url.URL, Method: download_url.Method, Fields: download_url.SignedHeader}
-				}
-				//Presigned POST, upload request
-				wr := objectRequest.Write
-				if wr != "" {
-					//A request valid volt, nem kell adatbázist lekérdezni, és a path-ot le kell generálni
-					path := fmt.Sprintf("jobs/%s/input/preprocessed", jobID)
-					//Be kell tenni az adatbázisba
-					_, err := databaseRetry(r.Context(), func(_ctx context.Context) (struct{}, error) {
-						return struct{}{}, database.SetStringValue(jobID, "preprocess_object_key", path, _ctx)
-					})
-					if err != nil {
-						logger.Error("Failed to update database at preprocess_object_key", "error", err)
-						response.Message = "Failed to update database at preprocess_object_key"
-						write_callback_response(response, &w, logger)
-						return
-					}
-					//Kérünk presigned URL-t
-					upload_url, err := storage.Get_Upload_URL(1800, path)
-					if err != nil {
-						logger.Error("Failed to get presigned URL", "error", err)
-						response.Message = "Failed to get presigned URL for requested write object"
-						write_callback_response(response, &w, logger)
-						return
-					}
-					response.Write = dto.ObjectUploadResponse{URL: upload_url.URL, Fields: upload_url.Values}
-				}
-			}
-			//Fel kell venni az adatbázisba a státuszváltozást
-			//Nem a "starting" statuszt akarom felvenni, hanem hogy az adott lépésben vagyok!
-			err := updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error { return database.SetStatus(jobID, request.Step, _ctx) })
-			if err != nil {
-				logger.Error("Failed to update database", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				response.Message = "Failed to update database with new status"
-				write_callback_response(response, &w, logger)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			//És akkor most tudunk válaszolni
-			write_callback_response(response, &w, logger)
 			return
 		case "completed":
 			//Ha completed, akkor a data-t fel kell tölteni
-			var objectKey string
+			var key string
 			//Ennek a switchnek a végén kell legyen value
 			switch request.Step {
 			case "ocr_processing":
-				objectKey = "ocr_results"
+				key = "ocr_results"
 			case "layout_processing":
-				objectKey = "layout_results"
+				key = "layout_results"
 			}
 			err = updateJobStatus(jobID, "completed", database, r.Context(), func(_ctx context.Context) error {
-				return database.CompleteWithResult(jobID, request.Data, objectKey, _ctx)
+				return database.CompleteWithResult(jobID, request.Data, key, _ctx)
 			})
 			if err != nil {
 				logger.Error("Failed to update database with completed status and data", "error", err)
-				response.Message = "Failed to update database with completed status and data"
 				w.WriteHeader(http.StatusInternalServerError)
-				write_callback_response(response, &w, logger)
 				return
 			}
 			logger.Info("Completed callback is sent back with 200OK")

@@ -2,12 +2,9 @@ package job
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
-	"os"
 	"slices"
 
 	"github.com/aldobo98/OCR-backend/dto"
@@ -45,28 +42,21 @@ func getValidSteps() []string {
 }
 
 func getValidStatuses() []string {
-	return []string{"starting", "completed", "failed"}
+	return []string{"completed", "failed"}
 }
 
 func validate_callback_request(request dto.CallbackRequest, db *Database, str *Storage, ctx context.Context) (CallbackResult, error) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	//jobID, step és status kötelező minden esetben
 	if request.JobID == "" || request.Step == "" || request.Status == "" {
-		logger.Error("Missing mandatory fields from callback request")
 		return CallbackInvalid, errors.New("callback request should contain both jobID, step and status")
 	}
-	logger.Info("Mandatory fields are in place in callback message :)")
 
 	//A step és a status csak bizonyos érték lehet
 	if slices.Index(getValidSteps(), request.Step) == -1 {
-		logger.Error("Invalid step in callback request", "invalid", request.Step)
 		return CallbackInvalid, fmt.Errorf("invalid step in callback request: %s, must be one of %s", request.Step, getValidSteps())
 	}
-	logger.Info("Valid step in callback request :)")
 
 	if slices.Index(getValidStatuses(), request.Status) == -1 {
-		logger.Error("Invalid status in callback request", "invalid", request.Status)
 		return CallbackInvalid, fmt.Errorf("invalid status in callback request: %s, must be one of %s", request.Status, getValidStatuses())
 	}
 	//Ha nem létezik a kért JobID, az is probléma
@@ -77,19 +67,12 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 	if !existence {
 		return Callback404, fmt.Errorf("the requested resource with id %s doesn't exist", request.JobID)
 	}
-	logger.Info("The requested record exists in the database :)")
 
 	//ha failed a status akkor kell errormessage
 	if request.Status == "failed" && request.ErrorMessage == "" {
 		return CallbackInvalid, errors.New("error message is mandatory when status is failed")
 	}
-	//a preprocess nem fog completed-et visszaküldeni
 	if request.Status == "completed" {
-		logger.Info("callback with completed status was requested")
-		//preprocessing nem küld vissza completed statust
-		if request.Step == "preprocessing" {
-			return CallbackInvalid, errors.New("preprocessing is not supposed to send back results")
-		}
 		if len(request.Data) == 0 || string(request.Data) == "null" {
 			return CallbackInvalid, errors.New("when OCR processing or Layout processing is completed, result data is mandatory")
 		}
@@ -97,81 +80,18 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 		var key string
 		switch request.Step {
 		case "ocr_processing":
-			logger.Info("completed callback with ocr_request arrived")
 			key = "ocr_results"
 		case "layout_processing":
 			key = "layout_results"
 		}
 		existingData, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return db.GetStringValue(request.JobID, key, _ctx) })
-		logger.Info("getObjectAtKey", "result", existingData)
 		if err != nil {
 			return CallbackError, fmt.Errorf("failed to validate existing data for record id %s, error %s", request.JobID, err)
 		}
 		if existingData != "" {
 			//Ez lehet idempotencia, elfogadjuk azt csokolom
-			logger.Info("RETURNING IDEMPOTENT COMPLETED CALLBACK")
 			return CallbackIgnored, nil
-		}
-		logger.Info("Not idempotent change")
-	}
-	//ha van objectRequest
-	if request.Requests != (dto.ObjectRequest{}) {
-		//ha kérünk olvasási hozzáférést, akkor az objektumnak léteznie kell
-		re := request.Requests.Read
-		if re != "" {
-			if re != "original" && re != "preprocess" {
-				return CallbackInvalid, errors.New("read requests should be either for original or for preprocess object")
-			}
-			objectKey := fmt.Sprintf("%s_object_key", re)
-			ret, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) {
-				return db.GetStringValue(request.JobID, objectKey, _ctx)
-			})
-			if err != nil {
-				return CallbackError, errors.New("failed to query database for requested read object")
-			}
-			if ret == "" {
-				return CallbackError, errors.New("the requested read object doesn't exist in database")
-			}
-			//Ha van az adatbázisban entry, akkor léteznie is kell az object storage-ban
-			existence, err := str.ObjectExists(ctx, ret)
-			if err != nil {
-				return CallbackError, errors.New("failed to validate read object existence in object storage")
-			}
-			if !existence {
-				return CallbackError, errors.New("the requested object doesn't exist in object storage")
-			}
-		}
-		wr := request.Requests.Write
-		if wr != "" {
-			//Egyenlőre csak a preprocess írását engedem
-			if wr != "preprocess" {
-				return CallbackError, errors.New("the requested object cannot be written")
-			}
-			//Ha létezik az adatbázisban, akkor már valaki írta -> nem írjuk felül
-			ret, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) {
-				return db.GetStringValue(request.JobID, "preprocess_object_key", _ctx)
-			})
-			if err != nil {
-				return CallbackError, errors.New("failed to query database for requested write object")
-			}
-			if ret != "" {
-				//Ha már valaki írta, akkor idempotencia lehet, nem módosítjuk, csak elfogadjuk
-				return CallbackIgnored, nil
-			}
 		}
 	}
 	return CallbackProcessed, nil
-}
-
-func write_callback_response(response dto.CallbackResponse, w *http.ResponseWriter, logger *slog.Logger) {
-	data, err := json.Marshal(response)
-	if err != nil {
-		logger.Error("Failed to marshal response", "error", err)
-		return
-	}
-	_, err = (*w).Write(data)
-	if err != nil {
-		logger.Error("Failed to write response data", "error", err)
-		(*w).WriteHeader(http.StatusInternalServerError)
-	}
 }
