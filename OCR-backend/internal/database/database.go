@@ -6,13 +6,15 @@ import (
 )
 
 type Database interface {
-	CreateRecord(jobID string, originalObjectKey string, ctx context.Context) error
+	CreateRecord(jobID string, originalObjectKey string, fileExtension string, documentType string, ctx context.Context) error
 	RecordExists(jobID string, ctx context.Context) (bool, error)
-	UpdateRecordStatus(jobID string, status string, ctx context.Context) error
-	GetRecordStatus(jobID string, ctx context.Context) (string, error)
-	GetObjectAtKey(jobID string, objectKey string, ctx context.Context) (string, error)
-	UpdateFailedStatusAndErrorMessage(jobID string, errorMessage string, ctx context.Context) error
-	UpdateRecordAtKey(jobID string, objectKey string, value string, ctx context.Context) error
-	UpdateCompletedStatusAndResults(jobID string, data json.RawMessage, objectKey string, ctx context.Context) error
+	SetStatus(jobID string, status string, ctx context.Context) error
+	GetStatus(jobID string, ctx context.Context) (string, error)
+	GetStringValue(jobID string, key string, ctx context.Context) (string, error)
+	FailWithMessage(jobID string, errorMessage string, ctx context.Context) error
+	SetStringValue(jobID string, key string, value string, ctx context.Context) error
+	CompleteWithResult(jobID string, data json.RawMessage, key string, ctx context.Context) error
+	GetFileExtension(jobID string, ctx context.Context) (string, error)
+	GetPreprocessingAttempts(jobID string, ctx context.Context) (int, error)
 	Ping() error
 }

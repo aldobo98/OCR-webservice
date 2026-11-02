@@ -2,6 +2,7 @@
 
 export interface GetUploadUrlRequest {
     contentType: string;
+    documentType: string;
 }
 
 export interface GetUploadUrlResponse {

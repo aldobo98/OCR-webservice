@@ -38,7 +38,7 @@ func NewDatabase(database database.Database) (*Database, error) {
 }
 
 func getSupportedStatuses() []string {
-	return []string{"created", "uploaded", "queued", "preprocessing", "ocr_processing", "layout_processing", "completed", "failed"}
+	return []string{"created", "uploaded", "preprocessing", "ocr_processing", "layout_processing", "completed", "failed"}
 }
 
 func validStatusChange(current string, goal string) bool {
@@ -53,10 +53,6 @@ func validStatusChange(current string, goal string) bool {
 			return false
 		}
 	case "uploaded":
-		if goal != "queued" {
-			return false
-		}
-	case "queued":
 		if goal != "ocr_processing" {
 			return false
 		}
@@ -133,17 +129,18 @@ func databaseRetry[T any](ctx context.Context, operation func(ctx context.Contex
 	return result, errors.New("unexpected end of database retry loop")
 }
 
-func createJob(contentType string, storage *Storage, database *Database, ctx context.Context) (*dto.CreateJobResponse, error) {
+func createJob(contentType string, documentType string, storage *Storage, database *Database, ctx context.Context) (*dto.CreateJobResponse, error) {
 	// 1. Egyedi azonosító létrehozása
 	jobID := uuid.New()
 
+	extension := strings.Split(strings.ReplaceAll(contentType, "}", ""), "/")[1]
 	// 2. Objektum útvonala
-	objectKey := fmt.Sprintf("jobs/%s/input/original.%s", jobID, strings.Split(strings.ReplaceAll(contentType, "}", ""), "/")[1])
+	objectKey := fmt.Sprintf("jobs/%s/input/original.%s", jobID, extension)
 
 	// 3. Adatbázisban elhelyezés
 	//TODO: Idempotencia? Ha már létezik a job, de hiba történt, és újrapróbálja a frontend??
 	_, err := databaseRetry(ctx, func(_ctx context.Context) (struct{}, error) {
-		return struct{}{}, database.CreateRecord(jobID.String(), objectKey, _ctx)
+		return struct{}{}, database.CreateRecord(jobID.String(), objectKey, extension, documentType, _ctx)
 	})
 	if err != nil {
 		return nil, err
@@ -170,7 +167,7 @@ func updateJobStatus(jobID string, status string, database *Database, ctx contex
 		return errors.New("requested new status is not supported")
 	}
 	//Le kell kérdezni a jelenlegi státuszt, és ellenőrizni kell, hogy azt beállíthatom-e, amit szeretnék
-	currentStatus, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return database.GetRecordStatus(jobID, _ctx) })
+	currentStatus, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return database.GetStatus(jobID, _ctx) })
 	if currentStatus == status {
 		//Idempotencia!
 		return nil

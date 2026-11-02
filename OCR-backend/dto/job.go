@@ -6,6 +6,7 @@ import "encoding/json"
 
 type CreateJobRequest struct {
 	ContentType string `json:"contentType"`
+	DocType     string `json:"documentType"`
 }
 
 type CreateJobResponse struct {

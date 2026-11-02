@@ -1,7 +1,7 @@
+
 "use client"
 
 import { CheckIcon, ChevronsUpDown } from "lucide-react"
-
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -21,18 +21,30 @@ import {
 
 import { cn } from "@/lib/utils"
 
-const languages = [
-  {
-    value: "eng",
-    label: "Angol",
-  },
-  {
-    value: "ger",
-    label: "Német",
-  },
-]
+type Option = {
+  value: string
+  label: string
+}
 
-export default function LanguageCombobox({value, onChange}: {value: string, onChange: (value:string) => void}) {
+type ComboBoxProps = {
+  options: Option[]
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  searchPlaceholder?: string
+  emptyMessage?: string
+  className?: string
+}
+
+export default function ComboBox({
+  options,
+  value,
+  onChange,
+  placeholder = "Válassz...",
+  searchPlaceholder = "Keresés...",
+  emptyMessage = "Nincs találat.",
+  className,
+}: ComboBoxProps) {
   const [open, setOpen] = React.useState(false)
 
   return (
@@ -42,34 +54,40 @@ export default function LanguageCombobox({value, onChange}: {value: string, onCh
           variant="noShadow_neutral"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between md:max-w-[200px]"
+          className={cn(
+            "w-full justify-between md:max-w-[200px]",
+            className
+          )}
         >
           {value
-            ? languages.find((language) => language.value === value)?.label
-            : "Válassz nyelvet..."}
+            ? options.find((option) => option.value === value)?.label
+            : placeholder}
           <ChevronsUpDown />
         </Button>
       </PopoverTrigger>
+
       <PopoverContent className="w-(--radix-popover-trigger-width) border-0 p-0">
         <Command className="**:data-[slot=command-input-wrapper]:h-11">
-          <CommandInput placeholder="Keress egy nyelvet..." />
+          <CommandInput placeholder={searchPlaceholder} />
           <CommandList className="p-1">
-            <CommandEmpty>Nincs ilyen nyelv.</CommandEmpty>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
-              {languages.map((language) => (
+              {options.map((option) => (
                 <CommandItem
-                  key={language.value}
-                  value={language.value}
+                  key={option.value}
+                  value={option.value}
                   onSelect={(currentValue) => {
                     onChange(currentValue === value ? "" : currentValue)
                     setOpen(false)
                   }}
                 >
-                  {language.label}
+                  {option.label}
                   <CheckIcon
                     className={cn(
                       "ml-auto",
-                      value === language.value ? "opacity-100" : "opacity-0",
+                      value === option.value
+                        ? "opacity-100"
+                        : "opacity-0"
                     )}
                   />
                 </CommandItem>

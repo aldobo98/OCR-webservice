@@ -2,31 +2,22 @@ import { Input } from "./input"
 import { Label } from "./label"
 import { Button } from "./button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card"
-import LanguageCombobox from "./language-combobox"
 import React from "react"
 import {startProcessing, uploadImage} from "@/api/upload"
 import { useToastManager } from "@/components/ui/toast"
 import { useState } from 'react';
-
-/*
-type ImageFormProps = {
-  setImg: (value: { image: File | null, text: string}) => void
-  setProc: (value: boolean) => void
-} */
-
-/*
-{
-        contentType:image.type,
-      }
-
-*/
+import ComboBox from "./combobox"
 
 
 export default function ImageForm(){
   const toast = useToastManager()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const [language, setLanguage] = React.useState("eng")
+  const docTypes = [
+    {value: "struct", label: "Struktúrált"},
+    {value: "unstruct", label: "Szöveges"}
+  ]
+  const [docType, setDocType] = React.useState("unstruct")
   const [image, setImage] = React.useState<File | null>(null)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -43,7 +34,7 @@ export default function ImageForm(){
     })
 
     try {
-      const jobId = await uploadImage({contentType: image.type}, image);
+      const jobId = await uploadImage({contentType: image.type, documentType: docType}, image);
 
       toast.update(toastId, {
         title: "Objektum feltöltése",
@@ -82,12 +73,11 @@ export default function ImageForm(){
     <Card className="w-full max-w-lg">
       <CardHeader>
         <CardTitle>Karakterfelismerés</CardTitle>
-        <CardDescription>A karakterfelismeréshez egy szöveget tartalmazó képet kell feltölteni, és a képen látható szöveg nyelvét kell kiválasztani.</CardDescription>
+        <CardDescription>A karakterfelismeréshez egy dokumentumot feltölteni, és a szöveg típusát kell kiválasztani.</CardDescription>
       </CardHeader>
       <CardContent>
-        
           <div className="flex flex-col pb-3">
-            <Label>Kép, amelyről a szöveget kell felismerni:</Label>
+            <Label>Dokumentum, ami szövegét kinyernéd:</Label>
             <Input type="file" id="image" required onChange={(e) => {
               if (e.target.files) {
                 setImage(e.target.files[0])
@@ -95,13 +85,13 @@ export default function ImageForm(){
             }} />
           </div>
           <div>
-            <Label>Képen látható szöveg nyelve:</Label>
-            <LanguageCombobox value={language} onChange={setLanguage}></LanguageCombobox>
+            <Label>Dokumentum típusa:</Label>
+            <ComboBox options={docTypes} value={docType} onChange={setDocType} placeholder="Válassz dokumentum típust" searchPlaceholder="Keress egy dokumentum típust" emptyMessage="Nincs ilyen dokumentum típus"></ComboBox>
           </div>
       </CardContent>
       <CardFooter className="flex-col gap-2">
         <Button type="submit">
-          Karakterek felismerése
+          Szöveg felismerése
         </Button>
       </CardFooter>
     </Card>

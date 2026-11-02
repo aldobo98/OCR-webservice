@@ -38,7 +38,7 @@ func CreateJobHandler(logger *slog.Logger, storage *Storage, database *Database)
 		logger.Info("Message body read", "value", request)
 
 		// 2. Meghívjuk a logikát
-		response, err := createJob(request.ContentType, storage, database, r.Context())
+		response, err := createJob(request.ContentType, request.DocType, storage, database, r.Context())
 
 		if err != nil {
 			logger.Error("Error during creating job", "error", err)
@@ -67,7 +67,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 		jobID := r.PathValue("jobID")
 		//2. Meghívjuk a logikát, hogy updateljük a státuszt
 		status_to_update := "uploaded"
-		err := updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error { return database.UpdateRecordStatus(jobID, status_to_update, _ctx) })
+		err := updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error { return database.SetStatus(jobID, status_to_update, _ctx) })
 		//Hogyha valami nem jó, vissza kell küldeni a problémát
 		if err != nil {
 			logger.Error("Failed to update status", "error", err)
@@ -77,7 +77,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 		//Le kell ellenőrizni, hogy az original object tényleg létezik-e
 		//Lekérdezzük az object nevét
 		objectKey, err := databaseRetry(r.Context(), func(_ctx context.Context) (string, error) {
-			return database.GetObjectAtKey(jobID, "original_object_key", _ctx)
+			return database.GetStringValue(jobID, "original_object_key", _ctx)
 		})
 		logger.Info("retrieved objectKey", "value", objectKey)
 		if err != nil || objectKey == "" {
@@ -102,7 +102,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 		logger.Info("Generated CloudEvent", "event", event)
 		//Beállítjuk az adatbázisban az új státuszt
 		status_to_update = "queued"
-		err = updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error { return database.UpdateRecordStatus(jobID, status_to_update, _ctx) })
+		err = updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error { return database.SetStatus(jobID, status_to_update, _ctx) })
 		if err != nil {
 			logger.Error("Failed to update status", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -115,7 +115,7 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 			logger.Error("Failed to send CloudEvent", "error", err)
 			status_to_update = "failed"
 			err = updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error {
-				return database.UpdateFailedStatusAndErrorMessage(jobID, "Failed to send CloudEvent to EventSink", _ctx)
+				return database.FailWithMessage(jobID, "Failed to send CloudEvent to EventSink", _ctx)
 			})
 			if err != nil {
 				logger.Error("Failed to set failed status and error message in database", "error", err)
@@ -180,7 +180,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			//DB update és statuscode visszaküldése
 			status_to_update := "failed"
 			err = updateJobStatus(jobID, status_to_update, database, r.Context(), func(_ctx context.Context) error {
-				return database.UpdateFailedStatusAndErrorMessage(jobID, request.ErrorMessage, _ctx)
+				return database.FailWithMessage(jobID, request.ErrorMessage, _ctx)
 			})
 			if err != nil {
 				logger.Error("Failed to update database after knative function reported failure", "error", err)
@@ -201,7 +201,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 					//Ki kell nyerni, amire szeretnénk download linket: original vagy preprocess
 					//Nem kell ellenőrizgetni semmit, már valid a request
 					path, err := databaseRetry(r.Context(), func(_ctx context.Context) (string, error) {
-						return database.GetObjectAtKey(jobID, fmt.Sprintf("%s_object_key", re), _ctx)
+						return database.GetStringValue(jobID, fmt.Sprintf("%s_object_key", re), _ctx)
 					})
 					if err != nil {
 						logger.Error("Failed to read path from database", "error", err)
@@ -227,7 +227,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 					path := fmt.Sprintf("jobs/%s/input/preprocessed", jobID)
 					//Be kell tenni az adatbázisba
 					_, err := databaseRetry(r.Context(), func(_ctx context.Context) (struct{}, error) {
-						return struct{}{}, database.UpdateRecordAtKey(jobID, "preprocess_object_key", path, _ctx)
+						return struct{}{}, database.SetStringValue(jobID, "preprocess_object_key", path, _ctx)
 					})
 					if err != nil {
 						logger.Error("Failed to update database at preprocess_object_key", "error", err)
@@ -248,7 +248,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			}
 			//Fel kell venni az adatbázisba a státuszváltozást
 			//Nem a "starting" statuszt akarom felvenni, hanem hogy az adott lépésben vagyok!
-			err := updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error { return database.UpdateRecordStatus(jobID, request.Step, _ctx) })
+			err := updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error { return database.SetStatus(jobID, request.Step, _ctx) })
 			if err != nil {
 				logger.Error("Failed to update database", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -271,7 +271,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 				objectKey = "layout_results"
 			}
 			err = updateJobStatus(jobID, "completed", database, r.Context(), func(_ctx context.Context) error {
-				return database.UpdateCompletedStatusAndResults(jobID, request.Data, objectKey, _ctx)
+				return database.CompleteWithResult(jobID, request.Data, objectKey, _ctx)
 			})
 			if err != nil {
 				logger.Error("Failed to update database with completed status and data", "error", err)

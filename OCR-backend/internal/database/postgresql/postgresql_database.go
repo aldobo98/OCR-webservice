@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -32,8 +31,7 @@ func getValueBasedOnPriority(argument string, env_variable string) string {
 }
 
 type Postgres struct {
-	db    *sql.DB
-	table string
+	db *sql.DB
 }
 
 const host_env = "DB_HOST"
@@ -41,7 +39,6 @@ const port_env = "DB_PORT"
 const user_env = "DB_USER"
 const password_env = "DB_PASSWORD"
 const dbName_env = "DB_NAME"
-const table_env = "DB_TABLE"
 
 func NewPostgres(host string, port string, user string, password string, dbname string, table string) (*Postgres, error) {
 	database_host := getValueBasedOnPriority(host, host_env)
@@ -64,21 +61,14 @@ func NewPostgres(host string, port string, user string, password string, dbname 
 	if database_name == "" {
 		return nil, errors.New("no database name is specified")
 	}
-	database_table := getValueBasedOnPriority(table, table_env)
-	if database_table == "" {
-		return nil, errors.New("no database table is specified")
-	}
 
 	db, err := sql.Open("pgx", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", database_host, database_port, database_user, database_password, database_name))
 	if err != nil {
 		return nil, err
 	}
 
-	db_sanitized_table := pgx.Identifier{database_table}.Sanitize()
-
 	return &Postgres{
-		db:    db,
-		table: db_sanitized_table,
+		db: db,
 	}, nil
 }
 
@@ -86,65 +76,51 @@ func (p *Postgres) Ping() error {
 	return p.db.Ping()
 }
 
-const createRecordQuery = "INSERT INTO %s (id, status, original_object_key) VALUES ($1, $2, $3)"
-
-func (p *Postgres) CreateRecord(jobID string, originalObjectKey string, ctx context.Context) error {
-	query := fmt.Sprintf(createRecordQuery, p.table)
-	_, err := p.db.ExecContext(ctx, query, jobID, "created", originalObjectKey)
+func (p *Postgres) CreateRecord(jobID string, originalObjectKey string, fileExtension string, documentType string, ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, `INSTERT INTO jobs 
+									(id, original_object_key, original_file_extension, document_type)
+									VALUES ($1, $2, $3, $4)`,
+		jobID, originalObjectKey, fileExtension, documentType)
 	return err
 }
 
-const updateRecordStatusQuery = "UPDATE %s SET status = $1 WHERE id = $2"
-
-func (p *Postgres) UpdateRecordStatus(jobID string, status string, ctx context.Context) error {
-	query := fmt.Sprintf(updateRecordStatusQuery, p.table)
-	_, err := p.db.ExecContext(ctx, query, status, jobID)
+func (p *Postgres) SetStatus(jobID string, status string, ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, `UPDATE jobs
+									SET status = $2
+									WHERE id = $1`,
+		jobID, status)
 	return err
 }
 
-const getObjectAtKeyQuery = "SELECT %s FROM %s WHERE id = $1"
-
-func (p *Postgres) GetObjectAtKey(jobID string, objectKey string, ctx context.Context) (string, error) {
-	query := fmt.Sprintf(getObjectAtKeyQuery, objectKey, p.table)
+func (p *Postgres) GetStringValue(jobID string, key string, ctx context.Context) (string, error) {
 	var object sql.NullString
-	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&object)
+	err := p.db.QueryRowContext(ctx, fmt.Sprintf("SELECT %s FROM jobs WHERE id = $1", key), jobID).Scan(&object)
 	if !object.Valid {
 		return "", nil
 	}
 	return object.String, err
 }
 
-const getRecordStatusQuery = "SELECT status FROM %s WHERE id = $1"
-
-func (p *Postgres) GetRecordStatus(jobID string, ctx context.Context) (string, error) {
-	query := fmt.Sprintf(getRecordStatusQuery, p.table)
+func (p *Postgres) GetStatus(jobID string, ctx context.Context) (string, error) {
 	var status string
-	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&status)
+	err := p.db.QueryRowContext(ctx, `SELECT status FROM jobs WHERE ID = $1`, jobID).Scan(&status)
 	return status, err
 }
 
-const setFailedAndMessage = "UPDATE %s SET status = 'failed' , error_message = $1 WHERE id = $2"
-
-func (p *Postgres) UpdateFailedStatusAndErrorMessage(jobID string, errorMessage string, ctx context.Context) error {
-	query := fmt.Sprintf(setFailedAndMessage, p.table)
-	_, err := p.db.ExecContext(ctx, query, errorMessage, jobID)
+func (p *Postgres) FailWithMessage(jobID string, errorMessage string, ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, `UPDATE jobs
+									SET status = 'failed', error_message = $2
+									WHERE id = $1`, jobID, errorMessage)
 	return err
 }
 
-const updateRecordAtKeyQuery = "UPDATE %s SET %s = $1 WHERE id = $2"
-
-func (p *Postgres) UpdateRecordAtKey(jobID string, objectKey string, value string, ctx context.Context) error {
-	query := fmt.Sprintf(updateRecordAtKeyQuery, p.table, objectKey)
-	_, err := p.db.ExecContext(ctx, query, value, jobID)
+func (p *Postgres) SetStringValue(jobID string, key string, value string, ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, fmt.Sprintf("UPDATE jobs SET %s = $2 WHERE id = $1", key), jobID, value)
 	return err
 }
 
-const updateCompletedAndResult = "UPDATE %s SET status = 'completed', %s = $1 WHERE id = $2"
-
-func (p *Postgres) UpdateCompletedStatusAndResults(jobID string, data json.RawMessage, objectKey string, ctx context.Context) error {
-	query := fmt.Sprintf(updateCompletedAndResult, p.table, objectKey)
-	fmt.Println(query)
-	_, err := p.db.ExecContext(ctx, query, data, jobID)
+func (p *Postgres) CompleteWithResult(jobID string, data json.RawMessage, key string, ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, fmt.Sprintf("UPDATE jobs SET status = 'completed', %s = $2 WHERE id = $1", key), jobID, data)
 	return err
 }
 
@@ -161,4 +137,16 @@ func (p *Postgres) RecordExists(jobID string, ctx context.Context) (bool, error)
 	}
 
 	return exists, nil
+}
+
+func (p *Postgres) GetFileExtension(jobID string, ctx context.Context) (string, error) {
+	var extension string
+	err := p.db.QueryRowContext(ctx, `SELECT original_file_extension FROM jobs WHERE ID = $1`, jobID).Scan(&extension)
+	return extension, err
+}
+
+func (p *Postgres) GetPreprocessingAttempts(jobID string, ctx context.Context) (int, error) {
+	var attempts int
+	err := p.db.QueryRowContext(ctx, `SELECT preprocessing_attempts FROM jobs WHERE ID = $1`, jobID).Scan(&attempts)
+	return attempts, err
 }

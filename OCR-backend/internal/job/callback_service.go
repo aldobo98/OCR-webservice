@@ -102,7 +102,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 		case "layout_processing":
 			key = "layout_results"
 		}
-		existingData, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return db.GetObjectAtKey(request.JobID, key, _ctx) })
+		existingData, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return db.GetStringValue(request.JobID, key, _ctx) })
 		logger.Info("getObjectAtKey", "result", existingData)
 		if err != nil {
 			return CallbackError, fmt.Errorf("failed to validate existing data for record id %s, error %s", request.JobID, err)
@@ -124,7 +124,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 			}
 			objectKey := fmt.Sprintf("%s_object_key", re)
 			ret, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) {
-				return db.GetObjectAtKey(request.JobID, objectKey, _ctx)
+				return db.GetStringValue(request.JobID, objectKey, _ctx)
 			})
 			if err != nil {
 				return CallbackError, errors.New("failed to query database for requested read object")
@@ -149,7 +149,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 			}
 			//Ha létezik az adatbázisban, akkor már valaki írta -> nem írjuk felül
 			ret, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) {
-				return db.GetObjectAtKey(request.JobID, "preprocess_object_key", _ctx)
+				return db.GetStringValue(request.JobID, "preprocess_object_key", _ctx)
 			})
 			if err != nil {
 				return CallbackError, errors.New("failed to query database for requested write object")
