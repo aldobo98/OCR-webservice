@@ -77,7 +77,7 @@ func (p *Postgres) Ping() error {
 }
 
 func (p *Postgres) CreateRecord(jobID string, originalObjectKey string, fileExtension string, documentType string, ctx context.Context) error {
-	_, err := p.db.ExecContext(ctx, `INSTERT INTO jobs 
+	_, err := p.db.ExecContext(ctx, `INSERT INTO jobs 
 									(id, original_object_key, original_file_extension, document_type)
 									VALUES ($1, $2, $3, $4)`,
 		jobID, originalObjectKey, fileExtension, documentType)
