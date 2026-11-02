@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aldobo98/OCR-backend/dto"
+	"github.com/aldobo98/OCR-backend/internal/broker"
 	"github.com/aldobo98/OCR-backend/internal/database"
 	"github.com/aldobo98/OCR-backend/internal/storage"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -27,6 +28,10 @@ type Database struct {
 	database.Database
 }
 
+type Broker struct {
+	broker.MessageBroker
+}
+
 func NewStorage(storage storage.Storage) (*Storage, error) {
 	err := storage.EnsureBucket()
 	return &Storage{Storage: storage}, err
@@ -35,6 +40,10 @@ func NewStorage(storage storage.Storage) (*Storage, error) {
 func NewDatabase(database database.Database) (*Database, error) {
 	err := database.Ping()
 	return &Database{Database: database}, err
+}
+
+func NewBroker(broker broker.MessageBroker) *Broker {
+	return &Broker{MessageBroker: broker}
 }
 
 func getSupportedStatuses() []string {

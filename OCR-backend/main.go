@@ -11,6 +11,7 @@ import (
 
 	"github.com/aldobo98/OCR-backend/internal/database/postgresql"
 	"github.com/aldobo98/OCR-backend/internal/job"
+	"github.com/aldobo98/OCR-backend/internal/sse"
 	"github.com/aldobo98/OCR-backend/internal/storage/aws_s3"
 )
 
@@ -36,6 +37,10 @@ func main() {
 		logger.Error("Failed to initialize service", "error", err)
 		return
 	}
+
+	hub := sse.NewSSeHub()
+	broker := job.NewBroker(hub)
+
 	mux := http.NewServeMux()
 
 	//Serve already built frontend
@@ -43,8 +48,10 @@ func main() {
 	mux.Handle("/", fs)
 
 	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, storage, db))
-	mux.Handle("POST /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, storage, db)) //Elkezdjük a feldolgozást
-	mux.Handle("POST /internal/jobs/callback", job.CreateCallBackHandler(logger, storage, db)) //Itt fognak visszajelezni a knative function-ok
+	mux.Handle("POST /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, storage, db, broker)) //Elkezdjük a feldolgozást
+	mux.Handle("POST /internal/jobs/callback", job.CreateCallBackHandler(logger, storage, db, broker)) //Itt fognak visszajelezni a knative function-ok
+	//Endpoint az SSE kapcsolatok kialakítására
+	mux.Handle("GET /api/jobs/{jobID}/events", job.CreateEventsHandler(logger, broker))
 
 	//Start HTTP server in a goroutine
 	s := http.Server{Addr: ":8080", Handler: mux}

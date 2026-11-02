@@ -43,3 +43,8 @@ type CallbackRequest struct {
 	Data         json.RawMessage `json:"data"`
 	ErrorMessage string          `json:"error"`
 }
+
+type ServerSentEvent struct {
+	Step   string `json:"step"`
+	Status string `json:"status"`
+}
