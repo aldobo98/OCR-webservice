@@ -1,6 +1,13 @@
 import { useEffect } from "react";
+import { useState } from 'react'
+
+interface JobProgress{
+    step: string;
+    status: string;
+}
 
 export function useJobEvents(jobID: string) {
+    const [stages, setStages] = useState<JobProgress[]>([]);
     useEffect(() => {
         if (!jobID) return;
 
@@ -9,8 +16,30 @@ export function useJobEvents(jobID: string) {
         );
 
         eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
+            const data:JobProgress = JSON.parse(event.data);
+            setStages((prev) => {
+                const existingIndex = prev.findIndex(
+                    (item) => item.step === data.step
+                );
 
+                // Ha már létezik, frissítjük
+                if (existingIndex !== -1) {
+                    return prev.map((item, index) =>
+                    index === existingIndex
+                        ? { ...item, status: data.status }
+                        : item
+                    );
+                }
+
+                // Ha még nem létezik, hozzáadjuk
+                return [
+                    ...prev,
+                    {
+                    step: data.step,
+                    status: data.status,
+                    },
+                ];
+                });
             console.log(data.status);
         };
 
@@ -22,4 +51,5 @@ export function useJobEvents(jobID: string) {
             eventSource.close();
         };
     }, [jobID]);
+    return stages;
 }

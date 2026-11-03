@@ -73,6 +73,14 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		sse_message := dto.ServerSentEvent{Step: "uploading", Status: "completed"}
+		sse_data, err := json.Marshal(sse_message)
+		if err != nil {
+			logger.Info("Failed to marshal and publish SSE message", "message", sse_message, "error", err)
+		} else {
+			broker.Publish(jobID, sse_data)
+			logger.Info("Published SSE message", "message", sse_message)
+		}
 		//Le kell ellenőrizni, hogy az original object tényleg létezik-e
 		//Lekérdezzük az object nevét
 		objectKey, err := databaseRetry(r.Context(), func(_ctx context.Context) (string, error) {
@@ -108,8 +116,8 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 		}
 		logger.Info("Successfully updated database status")
 		//Elküldjük a frontendnek, hogy az OCR elkezdődött
-		sse_message := dto.ServerSentEvent{Step: "ocr_processing", Status: "in progress"}
-		sse_data, err := json.Marshal(sse_message)
+		sse_message = dto.ServerSentEvent{Step: "ocr_processing", Status: "in progress"}
+		sse_data, err = json.Marshal(sse_message)
 		if err != nil {
 			logger.Info("Failed to marshal and publish SSE message", "message", sse_message, "error", err)
 		} else {
