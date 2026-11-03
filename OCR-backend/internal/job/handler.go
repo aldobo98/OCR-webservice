@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -257,12 +258,15 @@ func CreateEventsHandler(logger *slog.Logger, broker *Broker) http.HandlerFunc {
 				return
 
 			case event := <-channel:
-				data, err := json.Marshal(event)
+				_, err := fmt.Fprintf(w, "data: %s\n\n", event)
 				if err != nil {
-					continue
+					logger.Error("Failed to write SSE event", "error", err)
+					return
 				}
 
-				logger.Info("An event was sent to a subscribed frontend", "jobID", jobID, "data", data)
+				flusher.Flush()
+
+				logger.Info("An event was sent to a subscribed frontend", "jobID", jobID)
 				flusher.Flush()
 			}
 		}
