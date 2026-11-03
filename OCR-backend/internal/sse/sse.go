@@ -21,9 +21,14 @@ func NewSSeHub() *SSEHub {
 func (hub *SSEHub) Publish(topic string, message []byte) {
 	//Itt szimplán az adott topichoz tartozó slice-n végig kell menni, és a channelekre rá kell tenni az üzenetet.
 	hub.mu.RLock()
-	defer hub.mu.RUnlock()
-	for _, ch := range hub.clients[topic] {
-		ch <- message
+	clients := slices.Clone(hub.clients[topic])
+	hub.mu.RUnlock()
+	for _, ch := range clients {
+		select {
+		case ch <- message:
+		default:
+		}
+
 	}
 }
 
@@ -32,9 +37,6 @@ func (hub *SSEHub) Subscribe(topic string) chan []byte {
 	sub := make(chan []byte, 10)
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
-	if len(hub.clients[topic]) == 0 {
-		hub.clients[topic] = make([]chan []byte, 3)
-	}
 	hub.clients[topic] = append(hub.clients[topic], sub)
 	return sub
 }
