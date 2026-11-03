@@ -12,7 +12,7 @@ export function useJobEvents(jobID: string) {
         if (!jobID) return;
 
         const eventSource = new EventSource(
-            `http://localhost:8080/api/jobs/${jobID}/events`
+            `/api/jobs/${jobID}/events`
         );
 
         eventSource.onmessage = (event) => {
