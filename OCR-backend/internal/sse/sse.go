@@ -21,7 +21,7 @@ func NewSSeHub() *SSEHub {
 func (hub *SSEHub) Publish(topic string, message []byte) {
 	//Itt szimplán az adott topichoz tartozó slice-n végig kell menni, és a channelekre rá kell tenni az üzenetet.
 	hub.mu.RLock()
-	defer hub.mu.Unlock()
+	defer hub.mu.RUnlock()
 	for _, ch := range hub.clients[topic] {
 		ch <- message
 	}
