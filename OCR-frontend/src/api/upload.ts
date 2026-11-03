@@ -51,11 +51,16 @@ export async function uploadImage(request: GetUploadUrlRequest, file: File): Pro
 }
 
 export async function startProcessing(jobID: string) {
+    console.log("START PROCESSING CALLED:", jobID);
+
     const response = await fetch(`/api/jobs/${jobID}/start`,
         {
             method: "POST",
         }
     );
+
+    console.log("START RESPONSE:", response.status);
+
     if (!response.ok){
         throw new Error("Nem sikerült elkezdeni a processzálást!")
     }
