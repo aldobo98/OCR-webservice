@@ -16,7 +16,7 @@ export default function ImageForm({setJobID}: ImageFormProps){
     {value: "structured", label: "Struktúrált"},
     {value: "unstructured", label: "Szöveges"}
   ]
-  const [docType, setDocType] = React.useState("unstruct")
+  const [docType, setDocType] = React.useState("unstructured")
   const [image, setImage] = React.useState<File | null>(null)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

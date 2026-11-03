@@ -14,7 +14,7 @@ type JobStatusProps = {
 
 export default function JobStatus({ jobID }: JobStatusProps) {
   const stages = useJobEvents(jobID);
-
+  console.log("Current stages:", stages);
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
