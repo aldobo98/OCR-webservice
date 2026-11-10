@@ -170,7 +170,7 @@ func (p *Postgres) GetRow(jobID string, ctx context.Context) (dto.DatabaseRow, e
 	err := p.db.QueryRowContext(ctx,
 		`SELECT status, original_file_extension, document_type, preprocessing_attempts, original_object_key,
 				COALESCE(ocr_results, '{}'::jsonb),
-				COALESCE(structured_data, '{}'::jsonb),
+				COALESCE(layout_results, '{}'::jsonb),
 				COALESCE(error_message, ''),
 				COALESCE(preprocess_object_key, '')
 		FROM jobs
