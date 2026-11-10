@@ -77,11 +77,11 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 		//Egyébként meg kell nézni, hogy az írni kivánt data objectben már van-e valami, mert ha igen, akkor asszumálhatjuk az idempotenciát
 		switch request.Step {
 		case "ocr_processing":
-			if len(row.OcrResult) == 0 || string(row.OcrResult) == "{}" {
+			if string(row.OcrResult) != "{}" {
 				return CallbackIgnored, nil
 			}
 		case "layout_processing":
-			if len(row.LayoutResult) == 0 || string(row.LayoutResult) == "{}" {
+			if string(row.LayoutResult) != "{}" {
 				return CallbackIgnored, nil
 			}
 		}
