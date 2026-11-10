@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"slices"
 
 	"github.com/aldobo98/OCR-backend/dto"
@@ -47,6 +49,7 @@ func getValidStatuses() []string {
 }
 
 func validate_callback_request(request dto.CallbackRequest, db *Database, str *Storage, ctx context.Context) (CallbackResult, error) {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	//jobID, step és status kötelező minden esetben
 	if request.JobID == "" || request.Step == "" || request.Status == "" {
 		return CallbackInvalid, errors.New("callback request should contain both jobID, step and status")
@@ -62,6 +65,7 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 	}
 	//A következő ellenőrzésekhez lekérünk egy sort az adatbázisból
 	row, err := databaseRetry(ctx, func(_ctx context.Context) (dto.DatabaseRow, error) { return db.GetRow(request.JobID, _ctx) })
+	logger.Info("DATA OF THE ROW OF THE CALLBACK", "data", row)
 	//Ha nem létezik a kért JobID, az is probléma
 	if errors.Is(err, sql.ErrNoRows) {
 		return CallbackInvalid, fmt.Errorf("no job found for jobId %s", request.JobID)
