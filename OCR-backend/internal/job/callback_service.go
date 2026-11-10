@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -59,15 +60,12 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 	if slices.Index(getValidStatuses(), request.Status) == -1 {
 		return CallbackInvalid, fmt.Errorf("invalid status in callback request: %s, must be one of %s", request.Status, getValidStatuses())
 	}
+	//A következő ellenőrzésekhez lekérünk egy sort az adatbázisból
+	row, err := databaseRetry(ctx, func(_ctx context.Context) (dto.DatabaseRow, error) { return db.GetRow(request.JobID, _ctx) })
 	//Ha nem létezik a kért JobID, az is probléma
-	existence, err := databaseRetry(ctx, func(_ctx context.Context) (bool, error) { return db.RecordExists(request.JobID, _ctx) })
-	if err != nil {
-		return CallbackError, fmt.Errorf("error while walidating record existence: %s", err)
+	if errors.Is(err, sql.ErrNoRows) {
+		return CallbackInvalid, fmt.Errorf("no job found for jobId %s", request.JobID)
 	}
-	if !existence {
-		return Callback404, fmt.Errorf("the requested resource with id %s doesn't exist", request.JobID)
-	}
-
 	//ha failed a status akkor kell errormessage
 	if request.Status == "failed" && request.ErrorMessage == "" {
 		return CallbackInvalid, errors.New("error message is mandatory when status is failed")
@@ -77,20 +75,15 @@ func validate_callback_request(request dto.CallbackRequest, db *Database, str *S
 			return CallbackInvalid, errors.New("when OCR processing or Layout processing is completed, result data is mandatory")
 		}
 		//Egyébként meg kell nézni, hogy az írni kivánt data objectben már van-e valami, mert ha igen, akkor asszumálhatjuk az idempotenciát
-		var key string
 		switch request.Step {
 		case "ocr_processing":
-			key = "ocr_results"
+			if len(row.OcrResult) == 0 || string(row.OcrResult) == "{}" {
+				return CallbackIgnored, nil
+			}
 		case "layout_processing":
-			key = "layout_results"
-		}
-		existingData, err := databaseRetry(ctx, func(_ctx context.Context) (string, error) { return db.GetStringValue(request.JobID, key, _ctx) })
-		if err != nil {
-			return CallbackError, fmt.Errorf("failed to validate existing data for record id %s, error %s", request.JobID, err)
-		}
-		if existingData != "" {
-			//Ez lehet idempotencia, elfogadjuk azt csokolom
-			return CallbackIgnored, nil
+			if len(row.LayoutResult) == 0 || string(row.LayoutResult) == "{}" {
+				return CallbackIgnored, nil
+			}
 		}
 	}
 	return CallbackProcessed, nil

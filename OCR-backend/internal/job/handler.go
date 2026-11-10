@@ -2,7 +2,9 @@ package job
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -225,6 +227,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			}
 			logger.Info("Completed callback is sent back with 200OK")
 			w.WriteHeader(http.StatusOK)
+
 		}
 		sse_message := dto.ServerSentEvent{Step: request.Step, Status: request.Status}
 		sse_data, err := json.Marshal(sse_message)
@@ -234,6 +237,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			broker.Publish(jobID, sse_data)
 			logger.Info("Successfully published SSE message", "message", sse_message)
 		}
+		go isProcessComplete(request.JobID, request.Step, request.Status, database, broker, logger)
 	}
 }
 
@@ -270,5 +274,94 @@ func CreateEventsHandler(logger *slog.Logger, broker *Broker) http.HandlerFunc {
 				flusher.Flush()
 			}
 		}
+	}
+}
+
+func CreateResultsHandler(logger *slog.Logger, storage *Storage, database *Database) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jobID := r.PathValue("jobID")
+		//A result visszaküldéséhez lekérjük a sort
+		row, err := databaseRetry(r.Context(), func(_ctx context.Context) (dto.DatabaseRow, error) { return database.GetRow(jobID, _ctx) })
+		//Ha nem létezik a kért JobID, az is probléma
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Error("Failed to query database for file structure", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		//Megnézzük, hogy melyik result kell: ocr_results vagy layout_results
+		var results json.RawMessage
+		switch row.DocumentType {
+		case "unstructured": //Ezesetben az OCR eredménye kell
+			results = row.OcrResult
+		case "structured": //Ezesetben a layout ereménye kell
+			//results = row.LayoutResult
+			//A layout analysis eredménye fogalmam sincs, hogy milyen lesz, majd ezen a hídon átmegyek, ha eljutok oda.
+			//TODO: implement this thing
+			w.WriteHeader(http.StatusNotImplemented)
+			return
+
+		default: //Ilyen nem kéne hogy legyen, de hátha elírtam valamit
+			logger.Error("Unrecognized document structure", "structure", row.DocumentType)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if len(results) == 0 || string(results) == "{}" {
+			logger.Error("No results were retrieved", "jobID", jobID)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		//Megvan az eredményünk
+		if row.DocumentType == "unstructured" {
+			//A JSONB cuccot unmarshal-olni kell
+			var data dto.OCRResponse
+			err = json.Unmarshal(results, &data)
+			if err != nil {
+				logger.Error("Failed to unmarshal OCR results", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			//Egymás után kell fűzni a szavakat egy stringbe
+			var concat string
+			for _, v := range data.Results {
+				concat += " " + v.Text
+			}
+			//A megjelenítéshez elküldöm a letöltési linket
+			download_url, err := storage.Get_Download_URL(300, row.OrigKey)
+			if err != nil {
+				logger.Error("Failed to generate download URL", "jobId", jobID, "objectKey", row.OrigKey)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			download_resp := dto.ObjectDownloadResponse{
+				URL:    download_url.URL,
+				Method: download_url.Method,
+				Fields: download_url.SignedHeader,
+			}
+
+			response := dto.GetResultsResponse{
+				JobID:    jobID,
+				Download: download_resp,
+				Results:  concat,
+			}
+			resp_data, err := json.Marshal(&response)
+			if err != nil {
+				logger.Error("Failed to marshal message", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_, err = w.Write(resp_data)
+			if err != nil {
+				logger.Error("Failed to write response", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		//TODO: a structured ágat megírni
+		//else if structure == "structured"
+
 	}
 }

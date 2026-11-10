@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -238,4 +239,45 @@ func sendCloudEvent(ctx context.Context, cloudEvent event.Event, logger *slog.Lo
 		return fmt.Errorf("failed to send CloudEvent with error %w", result)
 	}
 	return nil
+}
+
+func isProcessComplete(jobID string, step string, status string, database *Database, broker *Broker, logger *slog.Logger) {
+	//Állapotgép annak felismerésére, hogy készen vagyunk-e
+	//Ha a státusz nem completed, biztosan nem vagyunk kész
+	if status != "completed" {
+		return
+	}
+	//A processz nem végződhet máshol, mint az ocr_processing vagy a layout_processing után.
+	if step != "ocr_processing" && step != "layout_processing" {
+		return
+	}
+	//Itt lehet, hogy vége van, ez attól függ, hogy a dokumentumnak milyen struktúrája van.
+	structure, err := databaseRetry(context.Background(), func(_ctx context.Context) (string, error) {
+		return database.GetStringValue(jobID, "document_type", _ctx)
+	})
+	if err != nil {
+		logger.Error("Failed to get document structure from database", "error", err)
+	}
+	switch structure {
+	case "structured":
+		if step != "layout_processing" {
+			return
+		}
+	case "unstructured":
+		if step != "ocr_processing" {
+			return
+		}
+	default:
+		logger.Info("Unrecognized documentum structure", "structure", structure)
+		return
+	}
+	//Ezesetben valóban kész vagyunk, és mehet az SSE értesítés.
+	sse_message := dto.ServerSentDone{JobID: jobID, Status: "completed"}
+	sse_data, err := json.Marshal(sse_message)
+	if err != nil {
+		logger.Info("Failed to marshal and publish SSE messsage", "message", sse_message, "error", err)
+	} else {
+		broker.Publish(jobID, sse_data)
+		logger.Info("Successfully published SSE message", "message", sse_message)
+	}
 }

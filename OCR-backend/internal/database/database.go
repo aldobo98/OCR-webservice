@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/aldobo98/OCR-backend/dto"
 )
 
 type Database interface {
@@ -16,5 +18,7 @@ type Database interface {
 	CompleteWithResult(jobID string, data json.RawMessage, key string, ctx context.Context) error
 	GetFileExtension(jobID string, ctx context.Context) (string, error)
 	GetPreprocessingAttempts(jobID string, ctx context.Context) (int, error)
+	GetJsonValue(jobID string, key string, ctx context.Context) (json.RawMessage, error)
+	GetRow(jobID string, ctx context.Context) (dto.DatabaseRow, error)
 	Ping() error
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aldobo98/OCR-backend/dto"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -149,4 +150,42 @@ func (p *Postgres) GetPreprocessingAttempts(jobID string, ctx context.Context) (
 	var attempts int
 	err := p.db.QueryRowContext(ctx, `SELECT preprocessing_attempts FROM jobs WHERE ID = $1`, jobID).Scan(&attempts)
 	return attempts, err
+}
+
+func (p *Postgres) GetJsonValue(jobID string, key string, ctx context.Context) (json.RawMessage, error) {
+	var object sql.Null[json.RawMessage]
+	query := fmt.Sprintf("SELECT %s FROM jobs WHERE id = $1", key)
+	err := p.db.QueryRowContext(ctx, query, jobID).Scan(&object)
+
+	if !object.Valid {
+		return nil, nil
+	}
+
+	return object.V, err
+}
+
+func (p *Postgres) GetRow(jobID string, ctx context.Context) (dto.DatabaseRow, error) {
+	var row dto.DatabaseRow
+
+	err := p.db.QueryRowContext(ctx,
+		`SELECT status, original_file_extension, document_type, preprocessing_attempts, original_object_key,
+				COALESCE(ocr_results, '{}'::jsonb),
+				COALESCE(structured_data, '{}'::jsonb),
+				COALESCE(error_message, ''),
+				COALESCE(preprocess_object_key, '')
+		FROM jobs
+		WHERE id = $1`,
+		jobID,
+	).Scan(
+		&row.Status,
+		&row.OrigFileExt,
+		&row.DocumentType,
+		&row.PrepAttempt,
+		&row.OrigKey,
+		&row.OcrResult,
+		&row.LayoutResult,
+		&row.ErrorMessage,
+		&row.PrepKey,
+	)
+	return row, err
 }

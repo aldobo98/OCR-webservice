@@ -50,8 +50,8 @@ func main() {
 	mux.Handle("POST /api/jobs", job.CreateJobHandler(logger, storage, db))
 	mux.Handle("POST /api/jobs/{jobID}/start", job.CreateOcrStartHandler(logger, storage, db, broker)) //Elkezdjük a feldolgozást
 	mux.Handle("POST /internal/jobs/callback", job.CreateCallBackHandler(logger, storage, db, broker)) //Itt fognak visszajelezni a knative function-ok
-	//Endpoint az SSE kapcsolatok kialakítására
-	mux.Handle("GET /api/jobs/{jobID}/events", job.CreateEventsHandler(logger, broker))
+	mux.Handle("GET /api/jobs/{jobID}/events", job.CreateEventsHandler(logger, broker))                //Endpoint az SSE kapcsolatok kialakítására
+	mux.Handle("GET /api/jobs/{jobID}/results", job.CreateResultsHandler(logger, storage, db))
 
 	//Start HTTP server in a goroutine
 	s := http.Server{Addr: ":8080", Handler: mux}
