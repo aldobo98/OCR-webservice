@@ -158,7 +158,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			case "layout_processing":
 				key = "layout_results"
 			}
-			err = updateJobStatus(jobID, "completed", database, r.Context(), func(_ctx context.Context) error {
+			err = updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error {
 				return database.CompleteWithResult(jobID, request.Data, key, _ctx)
 			})
 			if err != nil {

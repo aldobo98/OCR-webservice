@@ -197,7 +197,7 @@ func calculateNextStep(jobID string, step string, status string, db *Database, b
 		logger.Error("Failed to retrieve document structure from database", "error", err)
 	}
 	//Kész vagyunk, ha a struktúra unstructured és a step ocr_processing
-	switch row.Status {
+	switch status {
 	case "completed":
 		switch step {
 		case "ocr_processing":
