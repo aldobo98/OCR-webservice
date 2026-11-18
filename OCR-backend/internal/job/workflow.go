@@ -144,6 +144,7 @@ func startLayoutProcessing(jobID string, database *Database, broker *Broker, log
 	ocr_data, err := databaseRetry(context.Background(), func(_ctx context.Context) (json.RawMessage, error) {
 		return database.GetJsonValue(jobID, "ocr_results", _ctx)
 	})
+	logger.Info("OCR data before layout analysis", "data", ocr_data)
 	if err != nil {
 		logger.Error("Failed to retrieve ocr results", "error", err)
 		return err
