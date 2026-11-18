@@ -159,8 +159,8 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 				key = "layout_results"
 			}
 			logger.Info("OCR data from OCR function", "data", request.Data)
-			err = updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error {
-				return database.SetJsonValue(jobID, key, request.Data, _ctx)
+			_, err = databaseRetry(r.Context(), func(_ctx context.Context) (struct{}, error) {
+				return struct{}{}, database.SetJsonValue(jobID, key, request.Data, _ctx)
 			})
 			if err != nil {
 				logger.Error("Failed to update database with data", "error", err)
