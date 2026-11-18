@@ -166,8 +166,18 @@ func (p *Postgres) GetJsonValue(jobID string, key string, ctx context.Context) (
 
 func (p *Postgres) SetJsonValue(jobID string, key string, value json.RawMessage, ctx context.Context) error {
 	query := fmt.Sprintf("UPDATE jobs SET %s = $2 WHERE id = $1", key)
-	_, err := p.db.ExecContext(ctx, query, jobID, value)
-	return err
+	result, err := p.db.ExecContext(ctx, query, jobID, value)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Updated rows:", rows)
+	fmt.Println("Input JSON length:", len(value))
 }
 
 func (p *Postgres) GetRow(jobID string, ctx context.Context) (dto.DatabaseRow, error) {
