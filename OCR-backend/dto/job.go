@@ -34,6 +34,12 @@ type StartCharacterRecognition struct {
 	CallBackUrl string                 `json:"callbackUrl"`
 }
 
+type StartLayoutAnalysis struct {
+	JobID       string      `json:"jobId"`
+	OcrData     OCRResponse `json:"ocr_data"`
+	CallBackUrl string      `json:"callbackUrl"`
+}
+
 type GetResultsResponse struct {
 	JobID    string                 `json:"jobId"`
 	Download ObjectDownloadResponse `json:"download"`

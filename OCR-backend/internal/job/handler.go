@@ -83,69 +83,10 @@ func CreateOcrStartHandler(logger *slog.Logger, storage *Storage, database *Data
 			broker.Publish(jobID, sse_data)
 			logger.Info("Published SSE message", "message", sse_message)
 		}
-		//Le kell ellenőrizni, hogy az original object tényleg létezik-e
-		//Lekérdezzük az object nevét
-		objectKey, err := databaseRetry(r.Context(), func(_ctx context.Context) (string, error) {
-			return database.GetStringValue(jobID, "original_object_key", _ctx)
-		})
-		logger.Info("retrieved objectKey", "value", objectKey)
-		if err != nil || objectKey == "" {
-			logger.Error("Failed to get objectKey", "error", err)
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		//Leellenőrizzük, hogy az object az objektumtárolóban van-e
-		existence, err := storage.ObjectExists(r.Context(), objectKey)
-		if err != nil || !existence {
-			logger.Error("Failed to verify existence of object", "error", err)
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		//Kell egy cloudEvent amit átadhatunk a brokernek
-		event, err := createOcrCloudEvent(objectKey, jobID, storage)
+		err = startOcrProcessing(jobID, database, storage, broker, logger)
 		if err != nil {
-			logger.Error("Failed to create OCR CloudEvent", "error", err)
+			logger.Error("Failed to start OCR processing", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		logger.Info("Generated CloudEvent", "event", event)
-		//Beállítjuk az adatbázisban az új státuszt
-		err = updateJobStatus(jobID, "ocr_processing", database, r.Context(), func(_ctx context.Context) error { return database.SetStatus(jobID, "ocr_processing", _ctx) })
-		if err != nil {
-			logger.Error("Failed to update status", "error", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		logger.Info("Successfully updated database status")
-		//Elküldjük a frontendnek, hogy az OCR elkezdődött
-		sse_message = dto.ServerSentEvent{Step: "ocr_processing", Status: "in progress"}
-		sse_data, err = json.Marshal(sse_message)
-		if err != nil {
-			logger.Info("Failed to marshal and publish SSE message", "message", sse_message, "error", err)
-		} else {
-			broker.Publish(jobID, sse_data)
-			logger.Info("Published SSE message", "message", sse_message)
-		}
-		//Elküldjük az eseményt az eventSinkAddress-re
-		err = sendCloudEvent(r.Context(), event, logger)
-		if err != nil {
-			logger.Error("Failed to send CloudEvent", "error", err)
-			err = updateJobStatus(jobID, "failed", database, r.Context(), func(_ctx context.Context) error {
-				return database.FailWithMessage(jobID, "Failed to send CloudEvent to EventSink", _ctx)
-			})
-			if err != nil {
-				logger.Error("Failed to set failed status and error message in database", "error", err)
-			}
-			sse_message = dto.ServerSentEvent{Step: "ocr_processing", Status: "failed"}
-			sse_data, err = json.Marshal(sse_message)
-			if err != nil {
-				logger.Info("Failed to marshal and publish SSE message", "message", sse_message, "error", err)
-			} else {
-				broker.Publish(jobID, sse_data)
-				logger.Info("Published SSE message", "message", sse_message)
-			}
-			w.WriteHeader(http.StatusInternalServerError)
-			return
 		}
 		logger.Info("Successfully sent event to broker")
 		w.WriteHeader(http.StatusAccepted)
@@ -237,7 +178,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			broker.Publish(jobID, sse_data)
 			logger.Info("Successfully published SSE message", "message", sse_message)
 		}
-		go isProcessComplete(request.JobID, request.Step, request.Status, database, broker, logger)
+		go calculateNextStep(request.JobID, request.Step, request.Status, database, broker, storage, logger)
 	}
 }
 

@@ -2,7 +2,6 @@ package job
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -193,36 +192,6 @@ func updateJobStatus(jobID string, status string, database *Database, ctx contex
 	return err
 }
 
-func createOcrCloudEvent(objectPath string, jobID string, storage *Storage) (event.Event, error) {
-
-	download_url, err := storage.Get_Download_URL(900, objectPath)
-	if err != nil {
-		return event.Event{}, errors.New("failed to create object download pre-signed URL")
-	}
-
-	baseUrl := os.Getenv("BACKEND_URL")
-	if baseUrl == "" {
-		return event.Event{}, errors.New("failed to read baseUrl from env BACKEND_URL")
-	}
-
-	cloudEventData := dto.StartCharacterRecognition{
-		JobID: jobID,
-		Download: dto.ObjectDownloadResponse{
-			URL:    download_url.URL,
-			Method: download_url.Method,
-			Fields: download_url.SignedHeader,
-		},
-		CallBackUrl: fmt.Sprintf("%s/internal/jobs/callback", strings.TrimRight(baseUrl, "/")),
-	}
-
-	cloudEvent := cloudevents.NewEvent()
-	cloudEvent.SetSource("/ocr-backend")
-	cloudEvent.SetType("hu.ocr-backend.image.process")
-	cloudEvent.SetID(uuid.New().String())
-	err = cloudEvent.SetData(cloudevents.ApplicationJSON, cloudEventData)
-	return cloudEvent, err
-}
-
 func sendCloudEvent(ctx context.Context, cloudEvent event.Event, logger *slog.Logger) error {
 	//SinkBinding automatikus injektálja a broker címét a K_SINK környezeti változóba
 	eventSinkAddress := os.Getenv("K_SINK")
@@ -239,45 +208,4 @@ func sendCloudEvent(ctx context.Context, cloudEvent event.Event, logger *slog.Lo
 		return fmt.Errorf("failed to send CloudEvent with error %w", result)
 	}
 	return nil
-}
-
-func isProcessComplete(jobID string, step string, status string, database *Database, broker *Broker, logger *slog.Logger) {
-	//Állapotgép annak felismerésére, hogy készen vagyunk-e
-	//Ha a státusz nem completed, biztosan nem vagyunk kész
-	if status != "completed" {
-		return
-	}
-	//A processz nem végződhet máshol, mint az ocr_processing vagy a layout_processing után.
-	if step != "ocr_processing" && step != "layout_processing" {
-		return
-	}
-	//Itt lehet, hogy vége van, ez attól függ, hogy a dokumentumnak milyen struktúrája van.
-	structure, err := databaseRetry(context.Background(), func(_ctx context.Context) (string, error) {
-		return database.GetStringValue(jobID, "document_type", _ctx)
-	})
-	if err != nil {
-		logger.Error("Failed to get document structure from database", "error", err)
-	}
-	switch structure {
-	case "structured":
-		if step != "layout_processing" {
-			return
-		}
-	case "unstructured":
-		if step != "ocr_processing" {
-			return
-		}
-	default:
-		logger.Info("Unrecognized documentum structure", "structure", structure)
-		return
-	}
-	//Ezesetben valóban kész vagyunk, és mehet az SSE értesítés.
-	sse_message := dto.ServerSentDone{JobID: jobID, Status: "completed"}
-	sse_data, err := json.Marshal(sse_message)
-	if err != nil {
-		logger.Info("Failed to marshal and publish SSE messsage", "message", sse_message, "error", err)
-	} else {
-		broker.Publish(jobID, sse_data)
-		logger.Info("Successfully published SSE message", "message", sse_message)
-	}
 }
