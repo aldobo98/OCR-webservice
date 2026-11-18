@@ -160,10 +160,10 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			}
 			logger.Info("OCR data from OCR function", "data", request.Data)
 			err = updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error {
-				return database.CompleteWithResult(jobID, request.Data, key, _ctx)
+				return database.SetJsonValue(jobID, key, request.Data, _ctx)
 			})
 			if err != nil {
-				logger.Error("Failed to update database with completed status and data", "error", err)
+				logger.Error("Failed to update database with data", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}

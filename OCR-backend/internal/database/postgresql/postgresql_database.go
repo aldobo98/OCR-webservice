@@ -164,6 +164,12 @@ func (p *Postgres) GetJsonValue(jobID string, key string, ctx context.Context) (
 	return object.V, err
 }
 
+func (p *Postgres) SetJsonValue(jobID string, key string, value json.RawMessage, ctx context.Context) error {
+	query := fmt.Sprintf("UPDATE jobs SET %s = $2 WHERE id = $1", key)
+	_, err := p.db.ExecContext(ctx, query, jobID, value)
+	return err
+}
+
 func (p *Postgres) GetRow(jobID string, ctx context.Context) (dto.DatabaseRow, error) {
 	var row dto.DatabaseRow
 

@@ -19,6 +19,7 @@ type Database interface {
 	GetFileExtension(jobID string, ctx context.Context) (string, error)
 	GetPreprocessingAttempts(jobID string, ctx context.Context) (int, error)
 	GetJsonValue(jobID string, key string, ctx context.Context) (json.RawMessage, error)
+	SetJsonValue(jobID string, key string, value json.RawMessage, ctx context.Context) error
 	GetRow(jobID string, ctx context.Context) (dto.DatabaseRow, error)
 	Ping() error
 }
