@@ -162,7 +162,7 @@ func startLayoutProcessing(jobID string, database *Database, broker *Broker, log
 	event, err := createLayoutCloudEvent(ocr_results, jobID)
 	if err != nil {
 		logger.Error("Failed to create Layout CloudEvent", "error", err)
-		fmt.Errorf("failed to create Layout CloudEvent with error %v", err)
+		return fmt.Errorf("failed to create Layout CloudEvent with error %v", err)
 	}
 	logger.Info("Generated CloudEvent", "event", event)
 	//Beállítjuk az adatbázisban az új státuszt
@@ -197,8 +197,10 @@ func calculateNextStep(jobID string, step string, status string, db *Database, b
 		logger.Error("Failed to retrieve document structure from database", "error", err)
 	}
 	//Kész vagyunk, ha a struktúra unstructured és a step ocr_processing
-	if row.Status == "completed" {
-		if step == "ocr_processing" {
+	switch row.Status {
+	case "completed":
+		switch step {
+		case "ocr_processing":
 			if row.DocumentType == "unstructured" {
 				//Feltéve, ha van az adatbázisban eredmény
 				if len(row.OcrResult) != 0 {
@@ -214,7 +216,7 @@ func calculateNextStep(jobID string, step string, status string, db *Database, b
 				}
 				// TODO: itt valami baj van, de majd foglalkozom vele, ha kell :D
 			}
-		} else if step == "layout_processing" {
+		case "layout_processing":
 			if len(row.LayoutResult) != 0 {
 				sendDoneMessage(jobID, broker, logger)
 				return
@@ -222,10 +224,11 @@ func calculateNextStep(jobID string, step string, status string, db *Database, b
 			// TODO: itt is baj van, de majd foglalkozom vele, ha kell :D
 		}
 		// TODO: hozzá kell adni a preprocessinget is majd, most nem érdekel
-	} else if row.Status == "failed" {
-		if step == "ocr_processing" {
+	case "failed":
+		switch step {
+		case "ocr_processing":
 			_ = startOcrProcessing(jobID, db, storage, broker, logger)
-		} else if step == "layout_processing" {
+		case "layout_processing":
 			_ = startLayoutProcessing(jobID, db, broker, logger)
 		}
 	}
