@@ -158,6 +158,7 @@ func CreateCallBackHandler(logger *slog.Logger, storage *Storage, database *Data
 			case "layout_processing":
 				key = "layout_results"
 			}
+			logger.Info("OCR data from OCR function", "data", request.Data)
 			err = updateJobStatus(jobID, request.Step, database, r.Context(), func(_ctx context.Context) error {
 				return database.CompleteWithResult(jobID, request.Data, key, _ctx)
 			})
