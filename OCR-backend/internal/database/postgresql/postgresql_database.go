@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/aldobo98/OCR-backend/dto"
@@ -175,9 +176,9 @@ func (p *Postgres) SetJsonValue(jobID string, key string, value json.RawMessage,
 	if err != nil {
 		return err
 	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	fmt.Println("Updated rows:", rows)
-	fmt.Println("Input JSON length:", len(value))
+	logger.Info("Info from database update", "updated rows", rows, "input length", len(value))
 	return nil
 }
 
