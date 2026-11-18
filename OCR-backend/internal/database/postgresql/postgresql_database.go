@@ -178,6 +178,7 @@ func (p *Postgres) SetJsonValue(jobID string, key string, value json.RawMessage,
 
 	fmt.Println("Updated rows:", rows)
 	fmt.Println("Input JSON length:", len(value))
+	return nil
 }
 
 func (p *Postgres) GetRow(jobID string, ctx context.Context) (dto.DatabaseRow, error) {
