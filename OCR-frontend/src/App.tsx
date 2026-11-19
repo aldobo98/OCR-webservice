@@ -28,12 +28,12 @@ export function App() {
       </div>
       {jobID && (
         <div className="pt-24">
-          <JobStatus key={jobID} jobID={jobID} onResults={setResults} />
-        </div>
-      )}
-      {results && results.jobId === jobID && (
-        <div className="pt-24">
-          <ImageCard imageUrl={results.download.url} caption={resultToText(results.result)} />
+          {/* Amint megvannak az eredmények, a feldolgozási kártya helyére az eredmény kerül */}
+          {results && results.jobId === jobID ? (
+            <ImageCard imageUrl={results.download.url} caption={resultToText(results.result)} />
+          ) : (
+            <JobStatus key={jobID} jobID={jobID} onResults={setResults} />
+          )}
         </div>
       )}
     </div>

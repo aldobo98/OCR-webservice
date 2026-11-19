@@ -52,12 +52,12 @@ export default function JobStatus({ jobID, onResults }: JobStatusProps) {
   };
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-72 min-h-64 shrink-0">
       <CardHeader>
         <CardTitle>Dokumentum feldolgozása</CardTitle>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-1 flex-col gap-3">
         {stages.map((stage) => (
           <div key={stage.step} className="flex items-center gap-2">
             {stage.status === "completed" ? (
