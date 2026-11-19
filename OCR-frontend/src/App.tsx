@@ -1,52 +1,43 @@
-//import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from './components/ui/carousel'
-//import nobrain from '../public/ nobrain.jpg'
-//import money from '../public/money.jpg'
-//import { useState } from 'react';
 import { useState } from 'react'
 import ImageForm from './components/ui/image-form'
 import JobStatus from './components/ui/job-status';
-//import ImageCard from './components/ui/image-card';
+import ImageCard from './components/ui/image-card';
+import type { GetResultsResponse } from './api/results';
+
+//A raw JSON eredményből megjeleníthető szöveg
+function resultToText(result: unknown): string {
+  if (typeof result === "string") return result.trim();
+  return JSON.stringify(result, null, 2);
+}
 
 export function App() {
-/*
-  const [img, setImg] = useState<{image: File | null, text: string}>({
-    image: null,
-    text: "",
-  })
-  */
-
-  //const [processing, setProcessing] = useState(false);
-
   const [jobID, setJobID] = useState<string | null>(null);
+  const [results, setResults] = useState<GetResultsResponse | null>(null);
+
+  const handleNewJob = (id: string) => {
+    setResults(null);
+    setJobID(id);
+  };
 
   return (
     <div className="flex place-content-center gap-5">
       <div>
         <title>Karakterfelismerés</title>
         <h1 className="text-2xl pb-8 pt-8">Karakterfelismerés EasyOCR használatával</h1>
-          <ImageForm setJobID={setJobID}/>
+        <ImageForm setJobID={handleNewJob} />
       </div>
-    {jobID &&(
-      <div>
-        <JobStatus jobID={jobID}/>
-      </div>
-    )}
+      {jobID && (
+        <div className="pt-24">
+          <JobStatus key={jobID} jobID={jobID} onResults={setResults} />
+        </div>
+      )}
+      {results && results.jobId === jobID && (
+        <div className="pt-24">
+          <ImageCard imageUrl={results.download.url} caption={resultToText(results.result)} />
+        </div>
+      )}
     </div>
   )
 }
 
-/*
-{processing && (
-          <div className="flex flex-col items-center justify-center gap-4">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-black border-t-transparent" />
-            <p>Kérjük, várjon...</p>
-          </div>
-        )}
-
-        {img.image != null && (
-          <div>
-            <ImageCard imageUrl={URL.createObjectURL(img.image)} caption={img.text}></ImageCard>
-          </div>
-        )}
-*/
 export default App

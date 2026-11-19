@@ -3,7 +3,7 @@ import { Label } from "./label"
 import { Button } from "./button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card"
 import React from "react"
-import {startProcessing, uploadImage} from "@/api/upload"
+import {uploadImage} from "@/api/upload"
 import ComboBox from "./combobox"
 
 type ImageFormProps = {
@@ -27,12 +27,8 @@ export default function ImageForm({setJobID}: ImageFormProps){
     try {
       const jobId = await uploadImage({contentType: image.type, documentType: docType}, image);
       console.log("Upload finished, JobID:", jobId);
+      //A feldolgozást a JobStatus indítja el, miután feliratkozott az SSE eseményekre
       setJobID(jobId)
-
-      //Tell the backend that we're done
-      console.log("Calling startProcessing...");
-      await startProcessing(jobId)
-      console.log("startProcessing finished");
     } catch (error) {
       console.error("Image upload failed: ", error)
     }
