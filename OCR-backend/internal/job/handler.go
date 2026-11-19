@@ -282,10 +282,17 @@ func CreateResultsHandler(logger *slog.Logger, storage *Storage, database *Datab
 				Fields: download_url.SignedHeader,
 			}
 
+			result_data, err := json.Marshal(concat)
+			if err != nil {
+				logger.Error("Failed to marshal response", "error", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
 			response := dto.GetResultsResponse{
 				JobID:    jobID,
 				Download: download_resp,
-				Results:  concat,
+				Results:  result_data,
 			}
 			resp_data, err := json.Marshal(&response)
 			if err != nil {

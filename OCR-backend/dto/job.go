@@ -43,7 +43,7 @@ type StartLayoutAnalysis struct {
 type GetResultsResponse struct {
 	JobID    string                 `json:"jobId"`
 	Download ObjectDownloadResponse `json:"download"`
-	Results  string                 `json:"text"`
+	Results  json.RawMessage        `json:"result"`
 	//Majd ha lesz layout eredmény, akkor kitalálom, mit küldök vissza
 }
 
