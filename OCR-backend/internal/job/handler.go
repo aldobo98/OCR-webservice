@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/aldobo98/OCR-backend/dto"
 )
@@ -227,6 +228,9 @@ func CreateResultsHandler(logger *slog.Logger, storage *Storage, database *Datab
 		//Ha nem létezik a kért JobID, az is probléma
 		if errors.Is(err, sql.ErrNoRows) {
 			logger.Error("Failed to query database for file structure", "error", err)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		} else if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -236,12 +240,7 @@ func CreateResultsHandler(logger *slog.Logger, storage *Storage, database *Datab
 		case "unstructured": //Ezesetben az OCR eredménye kell
 			results = row.OcrResult
 		case "structured": //Ezesetben a layout ereménye kell
-			//results = row.LayoutResult
-			//A layout analysis eredménye fogalmam sincs, hogy milyen lesz, majd ezen a hídon átmegyek, ha eljutok oda.
-			//TODO: implement this thing
-			w.WriteHeader(http.StatusNotImplemented)
-			return
-
+			results = row.LayoutResult
 		default: //Ilyen nem kéne hogy legyen, de hátha elírtam valamit
 			logger.Error("Unrecognized document structure", "structure", row.DocumentType)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -253,8 +252,23 @@ func CreateResultsHandler(logger *slog.Logger, storage *Storage, database *Datab
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		//A megjelenítéshez elküldöm a letöltési linket
+		download_url, err := storage.Get_Download_URL(300, row.OrigKey)
+		if err != nil {
+			logger.Error("Failed to generate download URL", "jobId", jobID, "objectKey", row.OrigKey)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		download_resp := dto.ObjectDownloadResponse{
+			URL:    download_url.URL,
+			Method: download_url.Method,
+			Fields: download_url.SignedHeader,
+		}
+		var result_data []byte
 		//Megvan az eredményünk
-		if row.DocumentType == "unstructured" {
+		switch row.DocumentType {
+		case "unstructured":
 			//A JSONB cuccot unmarshal-olni kell
 			var data dto.OCRResponse
 			err = json.Unmarshal(results, &data)
@@ -264,53 +278,40 @@ func CreateResultsHandler(logger *slog.Logger, storage *Storage, database *Datab
 				return
 			}
 			//Egymás után kell fűzni a szavakat egy stringbe
-			var concat string
+			var concat strings.Builder
 			for _, v := range data.Results {
-				concat += " " + v.Text
-			}
-			//A megjelenítéshez elküldöm a letöltési linket
-			download_url, err := storage.Get_Download_URL(300, row.OrigKey)
-			if err != nil {
-				logger.Error("Failed to generate download URL", "jobId", jobID, "objectKey", row.OrigKey)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+				concat.WriteString(" ")
+				concat.WriteString(v.Text)
 			}
 
-			download_resp := dto.ObjectDownloadResponse{
-				URL:    download_url.URL,
-				Method: download_url.Method,
-				Fields: download_url.SignedHeader,
-			}
-
-			result_data, err := json.Marshal(concat)
+			result_data, err = json.Marshal(map[string]string{"text": strings.TrimSpace(concat.String())})
 			if err != nil {
 				logger.Error("Failed to marshal response", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-
-			response := dto.GetResultsResponse{
-				JobID:    jobID,
-				Download: download_resp,
-				Results:  result_data,
-			}
-			resp_data, err := json.Marshal(&response)
-			if err != nil {
-				logger.Error("Failed to marshal message", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			_, err = w.Write(resp_data)
-			if err != nil {
-				logger.Error("Failed to write response", "error", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
+		case "structured":
+			//Igazából én úgy ahogy van átadhatom a raw json-t, nem? Semmit nem kell az én oldalamon már feldolgozni rajta.
+			result_data = results
+		}
+		response := dto.GetResultsResponse{
+			JobID:    jobID,
+			Download: download_resp,
+			Results:  result_data,
+			Type:     row.DocumentType,
+		}
+		resp_data, err := json.Marshal(&response)
+		if err != nil {
+			logger.Error("Failed to marshal message", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		//TODO: a structured ágat megírni
-		//else if structure == "structured"
+		_, err = w.Write(resp_data)
+		if err != nil {
+			logger.Error("Failed to write response", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
 	}
 }

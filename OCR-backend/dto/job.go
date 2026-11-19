@@ -44,7 +44,7 @@ type GetResultsResponse struct {
 	JobID    string                 `json:"jobId"`
 	Download ObjectDownloadResponse `json:"download"`
 	Results  json.RawMessage        `json:"result"`
-	//Majd ha lesz layout eredmény, akkor kitalálom, mit küldök vissza
+	Type     string                 `json:"documentType"`
 }
 
 // A knative függvények ezen a requesten keresztül kommunikálnak a backenddel
