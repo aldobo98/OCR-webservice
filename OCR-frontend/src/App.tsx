@@ -2,12 +2,31 @@ import { useState } from 'react'
 import ImageForm from './components/ui/image-form'
 import JobStatus from './components/ui/job-status';
 import ImageCard from './components/ui/image-card';
+import InvoiceCard from './components/ui/invoice-card';
+import { Button } from './components/ui/button';
 import type { GetResultsResponse } from './api/results';
+import { downloadText } from './lib/export';
 
-//A raw JSON eredményből megjeleníthető szöveg
-function resultToText(result: unknown): string {
-  if (typeof result === "string") return result.trim();
-  return JSON.stringify(result, null, 2);
+//A documentType alapján választjuk ki a megfelelő nézetet
+function ResultView({ results }: { results: GetResultsResponse }) {
+  switch (results.documentType) {
+    case "unstructured":
+      return (
+        <div className="flex flex-col gap-3 items-start">
+          <ImageCard imageUrl={results.download.url} caption={results.result.text} />
+          <Button variant="neutral" onClick={() => downloadText(results.result.text, `ocr-${results.jobId}.txt`)}>
+            Export TXT
+          </Button>
+        </div>
+      );
+    case "structured":
+      return (
+        <div className="flex flex-wrap gap-5 items-start">
+          <ImageCard imageUrl={results.download.url} className="w-[400px]" />
+          <InvoiceCard invoice={results.result} jobID={results.jobId} />
+        </div>
+      );
+  }
 }
 
 export function App() {
@@ -30,7 +49,7 @@ export function App() {
         <div className="pt-24">
           {/* Amint megvannak az eredmények, a feldolgozási kártya helyére az eredmény kerül */}
           {results && results.jobId === jobID ? (
-            <ImageCard imageUrl={results.download.url} caption={resultToText(results.result)} />
+            <ResultView results={results} />
           ) : (
             <JobStatus key={jobID} jobID={jobID} onResults={setResults} />
           )}
